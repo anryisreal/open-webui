@@ -33,6 +33,18 @@
 /* --app-text-scale is updated via the UI Scale slider (Interface.svelte) */
 :root {
 	--app-text-scale: 1;
+	--gpthub-red: #e30613;
+	--gpthub-red-strong: #ff3148;
+	--gpthub-red-soft: #fff1f3;
+	--gpthub-red-soft-dark: rgba(227, 6, 19, 0.16);
+	--gpthub-ink: #111214;
+	--gpthub-ink-soft: #1c1d22;
+	--gpthub-paper: #fffcfb;
+	--gpthub-paper-soft: #fff7f8;
+	--gpthub-line: rgba(17, 18, 20, 0.08);
+	--gpthub-line-strong: rgba(227, 6, 19, 0.18);
+	--gpthub-shadow-lg: 0 28px 64px rgba(17, 18, 20, 0.14);
+	--gpthub-shadow-red: 0 22px 48px rgba(227, 6, 19, 0.22);
 }
 
 html {
@@ -694,13 +706,386 @@ input[type='number'] {
 }
 
 body {
-	background: #fff;
-	color: #000;
+	background: var(--gpthub-paper);
+	color: var(--gpthub-ink);
+	font-family: 'Mona Sans', 'Archivo', 'Vazirmatn', sans-serif;
 }
 
 .dark body {
-	background: #171717;
-	color: #eee;
+	background: #0f1014;
+	color: #f4f0f1;
+}
+
+body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	background:
+		radial-gradient(circle at top left, rgba(227, 6, 19, 0.16), transparent 28rem),
+		radial-gradient(circle at top right, rgba(15, 18, 20, 0.08), transparent 24rem),
+		linear-gradient(180deg, #fffdfc 0%, #fff7f8 52%, #fffdfc 100%);
+	z-index: -2;
+}
+
+.dark body::before {
+	background:
+		radial-gradient(circle at top left, rgba(227, 6, 19, 0.2), transparent 30rem),
+		radial-gradient(circle at top right, rgba(255, 255, 255, 0.06), transparent 24rem),
+		linear-gradient(180deg, #0f1014 0%, #15171c 100%);
+}
+
+body::after {
+	content: '';
+	position: fixed;
+	inset: auto 0 0 0;
+	height: 18rem;
+	pointer-events: none;
+	background: linear-gradient(180deg, transparent 0%, rgba(227, 6, 19, 0.05) 100%);
+	z-index: -1;
+}
+
+.gpthub-shell {
+	isolation: isolate;
+}
+
+.gpthub-app-frame {
+	background:
+		linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 247, 248, 0.9)),
+		radial-gradient(circle at top center, rgba(227, 6, 19, 0.06), transparent 26rem);
+}
+
+.dark .gpthub-app-frame {
+	background:
+		linear-gradient(180deg, rgba(17, 18, 20, 0.84), rgba(15, 16, 20, 0.96)),
+		radial-gradient(circle at top center, rgba(227, 6, 19, 0.12), transparent 28rem);
+}
+
+.gpthub-sidebar-rail {
+	background: linear-gradient(180deg, rgba(17, 18, 20, 0.98), rgba(27, 29, 34, 0.98));
+	border-right-color: rgba(255, 255, 255, 0.06);
+	box-shadow: 18px 0 48px rgba(0, 0, 0, 0.24);
+}
+
+.gpthub-sidebar-rail,
+.gpthub-sidebar-rail * {
+	color: #f5f2f3;
+}
+
+.gpthub-sidebar-panel {
+	background: linear-gradient(180deg, rgba(17, 18, 20, 0.92), rgba(27, 29, 34, 0.92));
+	border-right: 1px solid rgba(255, 255, 255, 0.06);
+	box-shadow: 24px 0 72px rgba(0, 0, 0, 0.28);
+}
+
+.gpthub-sidebar-inner {
+	background:
+		linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+		radial-gradient(circle at top left, rgba(227, 6, 19, 0.18), transparent 18rem);
+	backdrop-filter: blur(20px);
+}
+
+.gpthub-sidebar-header {
+	background: linear-gradient(180deg, rgba(17, 18, 20, 0.98), rgba(17, 18, 20, 0.7));
+	backdrop-filter: blur(20px);
+}
+
+#sidebar-webui-name {
+	color: #ffffff;
+	letter-spacing: 0.02em;
+	font-family: 'Archivo', 'Mona Sans', 'Vazirmatn', sans-serif;
+	font-weight: 650;
+}
+
+.gpthub-sidebar-panel .sidebar-new-chat-icon,
+.gpthub-sidebar-rail .sidebar-new-chat-icon {
+	box-shadow:
+		0 0 0 1px rgba(255, 255, 255, 0.12),
+		0 10px 24px rgba(227, 6, 19, 0.18);
+}
+
+.gpthub-sidebar-panel a[id='sidebar-new-chat-button'],
+.gpthub-sidebar-panel button[id='sidebar-search-button'],
+.gpthub-sidebar-panel a[id='sidebar-notes-button'],
+.gpthub-sidebar-panel a[id='sidebar-workspace-button'] {
+	border: 1px solid rgba(255, 255, 255, 0.04);
+	background: rgba(255, 255, 255, 0.03);
+	color: #f5f2f3;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.gpthub-sidebar-panel a[id='sidebar-new-chat-button']:hover,
+.gpthub-sidebar-panel button[id='sidebar-search-button']:hover,
+.gpthub-sidebar-panel a[id='sidebar-notes-button']:hover,
+.gpthub-sidebar-panel a[id='sidebar-workspace-button']:hover {
+	border-color: rgba(227, 6, 19, 0.28);
+	background: linear-gradient(135deg, rgba(227, 6, 19, 0.24), rgba(227, 6, 19, 0.1));
+	box-shadow: 0 16px 28px rgba(227, 6, 19, 0.16);
+}
+
+.gpthub-topbar-row {
+	padding-inline: 0.75rem;
+	padding-top: 0.4rem;
+}
+
+.gpthub-topbar-inner {
+	border: 1px solid var(--gpthub-line);
+	border-radius: 1.4rem;
+	background: rgba(255, 255, 255, 0.76);
+	backdrop-filter: blur(24px);
+	box-shadow: 0 14px 36px rgba(17, 18, 20, 0.08);
+}
+
+.dark .gpthub-topbar-inner {
+	border-color: rgba(255, 255, 255, 0.08);
+	background: rgba(23, 24, 29, 0.74);
+	box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+}
+
+#navbar-bg-gradient-to-b {
+	display: none;
+}
+
+.gpthub-topbar .rounded-xl:hover,
+.gpthub-topbar .rounded-lg:hover {
+	background: var(--gpthub-red-soft) !important;
+	color: var(--gpthub-red) !important;
+}
+
+.dark .gpthub-topbar .rounded-xl:hover,
+.dark .gpthub-topbar .rounded-lg:hover {
+	background: var(--gpthub-red-soft-dark) !important;
+	color: #ffffff !important;
+}
+
+.gpthub-model-selector-trigger {
+	border: 1px solid var(--gpthub-line);
+	border-radius: 999px;
+	background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 246, 247, 0.96));
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.92),
+		0 10px 24px rgba(17, 18, 20, 0.05);
+	padding: 0.18rem 0.55rem;
+}
+
+.dark .gpthub-model-selector-trigger {
+	border-color: rgba(255, 255, 255, 0.08);
+	background: linear-gradient(135deg, rgba(31, 33, 40, 0.96), rgba(19, 20, 25, 0.96));
+}
+
+.gpthub-model-selector-value {
+	color: var(--gpthub-ink);
+	font-weight: 650;
+}
+
+.dark .gpthub-model-selector-value {
+	color: #f7f3f4;
+}
+
+.gpthub-model-selector-menu {
+	border: 1px solid var(--gpthub-line) !important;
+	background: rgba(255, 255, 255, 0.92) !important;
+	backdrop-filter: blur(26px);
+	box-shadow: var(--gpthub-shadow-lg);
+}
+
+.dark .gpthub-model-selector-menu {
+	border-color: rgba(255, 255, 255, 0.08) !important;
+	background: rgba(22, 24, 30, 0.94) !important;
+}
+
+.gpthub-model-search-input {
+	color: var(--gpthub-ink);
+}
+
+.dark .gpthub-model-search-input {
+	color: #f7f3f4;
+}
+
+.gpthub-model-filterbar button {
+	border-radius: 999px;
+	padding: 0.32rem 0.7rem;
+}
+
+.gpthub-model-filterbar button:hover {
+	background: var(--gpthub-red-soft);
+	color: var(--gpthub-red) !important;
+}
+
+.dark .gpthub-model-filterbar button:hover {
+	background: rgba(227, 6, 19, 0.18);
+	color: #ffffff !important;
+}
+
+.gpthub-model-item {
+	border: 1px solid transparent;
+	background: rgba(255, 255, 255, 0.56);
+}
+
+.dark .gpthub-model-item {
+	background: rgba(255, 255, 255, 0.02);
+}
+
+.gpthub-model-item:hover,
+.gpthub-model-item[data-arrow-selected='true'],
+.gpthub-model-item[aria-selected='true'] {
+	border-color: var(--gpthub-line-strong);
+	background: linear-gradient(135deg, rgba(227, 6, 19, 0.12), rgba(17, 18, 20, 0.04));
+}
+
+.dark .gpthub-model-item:hover,
+.dark .gpthub-model-item[data-arrow-selected='true'],
+.dark .gpthub-model-item[aria-selected='true'] {
+	background: linear-gradient(135deg, rgba(227, 6, 19, 0.2), rgba(255, 255, 255, 0.03));
+}
+
+.gpthub-chat-shell {
+	position: relative;
+	background:
+		radial-gradient(circle at top center, rgba(227, 6, 19, 0.09), transparent 22rem),
+		linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0));
+}
+
+.gpthub-chat-pane {
+	position: relative;
+}
+
+.gpthub-messages-container {
+	scroll-padding-top: 1rem;
+}
+
+#message-input-container {
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 250, 251, 0.98)) !important;
+	border-color: rgba(227, 6, 19, 0.12) !important;
+	box-shadow: var(--gpthub-shadow-lg);
+}
+
+.dark #message-input-container {
+	background: linear-gradient(180deg, rgba(21, 22, 28, 0.96), rgba(15, 16, 20, 0.98)) !important;
+	border-color: rgba(227, 6, 19, 0.18) !important;
+}
+
+#message-input-container:focus-within {
+	border-color: rgba(227, 6, 19, 0.42) !important;
+	box-shadow:
+		0 0 0 6px rgba(227, 6, 19, 0.08),
+		var(--gpthub-shadow-red);
+}
+
+#input-menu-button,
+#integration-menu-button,
+#model-valves-button,
+#voice-input-button,
+#create-note-button {
+	background: var(--gpthub-red-soft) !important;
+	color: var(--gpthub-red) !important;
+}
+
+.dark #input-menu-button,
+.dark #integration-menu-button,
+.dark #model-valves-button,
+.dark #voice-input-button,
+.dark #create-note-button {
+	background: rgba(227, 6, 19, 0.14) !important;
+	color: #ffffff !important;
+}
+
+#input-menu-button:hover,
+#integration-menu-button:hover,
+#model-valves-button:hover,
+#voice-input-button:hover,
+#create-note-button:hover {
+	background: rgba(227, 6, 19, 0.14) !important;
+}
+
+.dark #input-menu-button:hover,
+.dark #integration-menu-button:hover,
+.dark #model-valves-button:hover,
+.dark #voice-input-button:hover,
+.dark #create-note-button:hover {
+	background: rgba(227, 6, 19, 0.22) !important;
+}
+
+#send-message-button {
+	background: linear-gradient(135deg, var(--gpthub-red), var(--gpthub-red-strong)) !important;
+	color: #ffffff !important;
+	box-shadow: 0 14px 32px rgba(227, 6, 19, 0.24);
+}
+
+#send-message-button:hover {
+	box-shadow: 0 20px 36px rgba(227, 6, 19, 0.3);
+	transform: translateY(-1px);
+}
+
+#send-message-button:disabled {
+	background: linear-gradient(135deg, rgba(227, 6, 19, 0.28), rgba(17, 18, 20, 0.18)) !important;
+	box-shadow: none;
+}
+
+.gpthub-auth-page {
+	overflow: hidden;
+}
+
+.gpthub-auth-page > div:first-child {
+	background:
+		radial-gradient(circle at top left, rgba(227, 6, 19, 0.22), transparent 26rem),
+		radial-gradient(circle at bottom right, rgba(17, 18, 20, 0.12), transparent 26rem),
+		linear-gradient(180deg, #fffdfc 0%, #fff5f6 100%) !important;
+}
+
+.dark .gpthub-auth-page > div:first-child {
+	background:
+		radial-gradient(circle at top left, rgba(227, 6, 19, 0.26), transparent 26rem),
+		radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.06), transparent 22rem),
+		linear-gradient(180deg, #0f1014 0%, #15171c 100%) !important;
+}
+
+.gpthub-auth-form {
+	max-width: 34rem;
+	margin-inline: auto;
+	padding: 2.25rem 2rem;
+	border-radius: 2rem;
+	background: rgba(255, 255, 255, 0.82);
+	border: 1px solid rgba(255, 255, 255, 0.78);
+	backdrop-filter: blur(28px);
+	box-shadow: var(--gpthub-shadow-lg);
+}
+
+.dark .gpthub-auth-form {
+	background: rgba(21, 22, 28, 0.82);
+	border-color: rgba(255, 255, 255, 0.08);
+}
+
+#auth-page input,
+#auth-page textarea {
+	border: 1px solid var(--gpthub-line);
+	border-radius: 1rem;
+	background: rgba(255, 255, 255, 0.86);
+	padding: 0.88rem 1rem;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.dark #auth-page input,
+.dark #auth-page textarea {
+	border-color: rgba(255, 255, 255, 0.08);
+	background: rgba(255, 255, 255, 0.04);
+	box-shadow: none;
+}
+
+#auth-page button[type='submit'] {
+	background: linear-gradient(135deg, var(--gpthub-red), var(--gpthub-red-strong)) !important;
+	color: #ffffff !important;
+	box-shadow: 0 18px 36px rgba(227, 6, 19, 0.24);
+}
+
+#auth-page button[type='submit']:hover {
+	box-shadow: 0 22px 40px rgba(227, 6, 19, 0.28);
+}
+
+#auth-page #logo {
+	box-shadow:
+		0 0 0 8px rgba(255, 255, 255, 0.52),
+		0 22px 44px rgba(227, 6, 19, 0.22);
 }
 
 /* Position the handle relative to each LI */

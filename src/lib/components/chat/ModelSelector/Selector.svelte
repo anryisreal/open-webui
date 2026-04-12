@@ -405,7 +405,7 @@
 	}}
 >
 	<DropdownMenu.Trigger
-		class="relative w-full {($settings?.highContrastMode ?? false)
+		class="gpthub-model-selector-trigger relative w-full {($settings?.highContrastMode ?? false)
 			? ''
 			: 'outline-hidden focus:outline-hidden'}"
 		aria-label={selectedModel
@@ -414,7 +414,7 @@
 		id="model-selector-{id}-button"
 	>
 		<div
-			class="flex w-full text-left px-0.5 bg-transparent truncate {triggerClassName} justify-between {($settings?.highContrastMode ??
+			class="gpthub-model-selector-value flex w-full text-left px-0.5 bg-transparent truncate {triggerClassName} justify-between {($settings?.highContrastMode ??
 			false)
 				? 'dark:placeholder-gray-100 placeholder-gray-800'
 				: 'placeholder-gray-400'}"
@@ -451,7 +451,7 @@
 					<div {...wrapperProps}>
 						<div
 							{...props}
-							class="{props.class} z-40 {$mobile
+							class="{props.class} gpthub-model-selector-menu z-40 {$mobile
 								? `w-full`
 								: `${className}`} max-w-[calc(100vw-1rem)] justify-start rounded-2xl bg-white dark:bg-gray-850 dark:text-white shadow-lg outline-hidden"
 							transition:flyAndScale
@@ -464,7 +464,7 @@
 										<input
 											id="model-search-input"
 											bind:value={searchValue}
-											class="w-full text-sm bg-transparent outline-hidden"
+											class="gpthub-model-search-input w-full text-sm bg-transparent outline-hidden"
 											placeholder={searchPlaceholder}
 											autocomplete="off"
 											aria-label={$i18n.t('Search In Models')}
@@ -498,7 +498,7 @@
 									</div>
 								{/if}
 
-								<div class="px-2">
+								<div class="gpthub-model-filterbar px-2">
 									{#if tags && items.filter((item) => !(item.model?.info?.meta?.hidden ?? false)).length > 0}
 										<div
 											class=" flex w-full bg-white dark:bg-gray-850 overflow-x-auto scrollbar-none font-[450] mb-0.5"
@@ -628,7 +628,7 @@
 									{:else}
 										<!-- svelte-ignore a11y-no-static-element-interactions -->
 										<div
-											class="max-h-64 overflow-y-auto"
+											class="gpthub-model-options max-h-64 overflow-y-auto"
 											role="listbox"
 											aria-label={$i18n.t('Available models')}
 											bind:this={listContainer}
