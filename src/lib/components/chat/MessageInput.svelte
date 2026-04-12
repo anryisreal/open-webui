@@ -531,14 +531,10 @@
 	$: showToolsButton = ($tools ?? []).length > 0 || ($toolServers ?? []).length > 0;
 
 	let showWebSearchButton = false;
-	$: showWebSearchButton =
-		(atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).length ===
-			webSearchCapableModels.length &&
-		$config?.features?.enable_web_search &&
-		($_user.role === 'admin' || $_user?.permissions?.features?.web_search);
+	$: showWebSearchButton = (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).length > 0;
 
 	let showDeepResearchButton = false;
-	$: showDeepResearchButton = showWebSearchButton;
+	$: showDeepResearchButton = (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).length > 0;
 
 	let showImageGenerationButton = false;
 	$: showImageGenerationButton =
