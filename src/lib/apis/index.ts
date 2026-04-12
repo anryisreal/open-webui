@@ -1395,25 +1395,57 @@ export const getUsage = async (token: string = '') => {
 	return res;
 };
 
+const isRetryableBackendConfigError = (error: any) => {
+	if (error instanceof TypeError) {
+		return true;
+	}
+
+	const status = Number(error?.status ?? error?.status_code);
+	return Number.isNaN(status) || status >= 500;
+};
+
+const waitForBackendConfigRetry = async (attempt: number) => {
+	await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+};
+
 export const getBackendConfig = async () => {
 	let error = null;
+	let res = null;
 
-	const res = await fetch(`${WEBUI_BASE_URL}/api/config`, {
-		method: 'GET',
-		credentials: 'include',
-		headers: {
-			'Content-Type': 'application/json'
-		}
-	})
-		.then(async (res) => {
-			if (!res.ok) throw await res.json();
-			return res.json();
+	for (let attempt = 1; attempt <= 4; attempt += 1) {
+		error = null;
+		res = await fetch(`${WEBUI_BASE_URL}/api/config`, {
+			method: 'GET',
+			credentials: 'include',
+			headers: {
+				'Content-Type': 'application/json'
+			}
 		})
-		.catch((err) => {
-			console.error(err);
-			error = err;
-			return null;
-		});
+			.then(async (res) => {
+				if (!res.ok) {
+					const detail = await res.json().catch(() => res.statusText);
+					throw {
+						...(typeof detail === 'object' && detail !== null ? detail : { detail }),
+						status: res.status
+					};
+				}
+				return res.json();
+			})
+			.catch((err) => {
+				error = err;
+				return null;
+			});
+
+		if (!error || attempt === 4 || !isRetryableBackendConfigError(error)) {
+			break;
+		}
+
+		await waitForBackendConfigRetry(attempt);
+	}
+
+	if (error) {
+		console.error(error);
+	}
 
 	if (error) {
 		// When a forward-auth proxy (e.g. Authentik/Traefik) intercepts the
