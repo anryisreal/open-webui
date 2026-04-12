@@ -44,15 +44,16 @@
 	} from '$lib/apis/chats';
 	import { createNewFolder, getFolders, updateFolderParentIdById } from '$lib/apis/folders';
 	import { checkActiveChats } from '$lib/apis/tasks';
-	import { WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
+	import { WEBUI_API_BASE_URL } from '$lib/constants';
 
 	import ArchivedChatsModal from './ArchivedChatsModal.svelte';
 	import UserMenu from './Sidebar/UserMenu.svelte';
 	import ChatItem from './Sidebar/ChatItem.svelte';
-	import Spinner from '../common/Spinner.svelte';
-	import Loader from '../common/Loader.svelte';
-	import Folder from '../common/Folder.svelte';
-	import Tooltip from '../common/Tooltip.svelte';
+import Spinner from '../common/Spinner.svelte';
+import Loader from '../common/Loader.svelte';
+import Folder from '../common/Folder.svelte';
+import Tooltip from '../common/Tooltip.svelte';
+import MtsLogoMark from '../branding/MtsLogoMark.svelte';
 	import Folders from './Sidebar/Folders.svelte';
 	import { getChannels, createNewChannel } from '$lib/apis/channels';
 	import ChannelModal from './Sidebar/ChannelModal.svelte';
@@ -712,11 +713,7 @@
 						aria-label={$showSidebar ? $i18n.t('Close Sidebar') : $i18n.t('Open Sidebar')}
 					>
 						<div class=" self-center flex items-center justify-center size-9">
-							<img
-								src="{WEBUI_BASE_URL}/static/favicon.png"
-								class="sidebar-new-chat-icon size-6 rounded-full group-hover:hidden"
-								alt=""
-							/>
+							<MtsLogoMark className="sidebar-new-chat-icon size-6 overflow-hidden rounded-xl group-hover:hidden" />
 
 							<Sidebar className="size-5 hidden group-hover:flex" />
 						</div>
@@ -906,12 +903,7 @@
 					draggable="false"
 					on:click={newChatHandler}
 				>
-					<img
-						crossorigin="anonymous"
-						src="{WEBUI_BASE_URL}/static/favicon.png"
-						class="sidebar-new-chat-icon size-6 rounded-full"
-						alt=""
-					/>
+					<MtsLogoMark className="sidebar-new-chat-icon size-6 overflow-hidden rounded-xl" />
 				</a>
 
 				<a href="/" class="flex flex-1 px-1.5" on:click={newChatHandler}>

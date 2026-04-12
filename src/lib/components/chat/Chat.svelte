@@ -148,6 +148,7 @@
 
 	let imageGenerationEnabled = false;
 	let webSearchEnabled = false;
+	let deepResearchEnabled = false;
 	let codeInterpreterEnabled = false;
 
 	let showCommands = false;
@@ -186,7 +187,9 @@
 		selectedToolIds = [];
 		selectedFilterIds = [];
 		webSearchEnabled = false;
+		deepResearchEnabled = false;
 		imageGenerationEnabled = false;
+		codeInterpreterEnabled = false;
 
 		const storageChatInput = sessionStorage.getItem(
 			`chat-input${chatIdProp ? `-${chatIdProp}` : ''}`
@@ -216,6 +219,7 @@
 						selectedToolIds = input.selectedToolIds;
 						selectedFilterIds = input.selectedFilterIds;
 						webSearchEnabled = input.webSearchEnabled;
+						deepResearchEnabled = input.deepResearchEnabled ?? false;
 						imageGenerationEnabled = input.imageGenerationEnabled;
 						codeInterpreterEnabled = input.codeInterpreterEnabled;
 					}
@@ -277,6 +281,7 @@
 		selectedFilterIds = [];
 		pendingOAuthTools = [];
 		webSearchEnabled = false;
+		deepResearchEnabled = false;
 		imageGenerationEnabled = false;
 		codeInterpreterEnabled = false;
 
@@ -739,6 +744,7 @@
 				selectedToolIds = [];
 				selectedFilterIds = [];
 				webSearchEnabled = false;
+				deepResearchEnabled = false;
 				imageGenerationEnabled = false;
 				codeInterpreterEnabled = false;
 
@@ -751,6 +757,7 @@
 						selectedToolIds = input.selectedToolIds;
 						selectedFilterIds = input.selectedFilterIds;
 						webSearchEnabled = input.webSearchEnabled;
+						deepResearchEnabled = input.deepResearchEnabled ?? false;
 						imageGenerationEnabled = input.imageGenerationEnabled;
 						codeInterpreterEnabled = input.codeInterpreterEnabled;
 					}
@@ -1169,12 +1176,25 @@
 			webSearchEnabled = true;
 		}
 
+		if ($page.url.searchParams.get('deep-research') === 'true') {
+			deepResearchEnabled = true;
+			webSearchEnabled = false;
+			imageGenerationEnabled = false;
+			codeInterpreterEnabled = false;
+		}
+
 		if ($page.url.searchParams.get('image-generation') === 'true') {
 			imageGenerationEnabled = true;
 		}
 
 		if ($page.url.searchParams.get('code-interpreter') === 'true') {
 			codeInterpreterEnabled = true;
+		}
+
+		if (deepResearchEnabled) {
+			webSearchEnabled = false;
+			imageGenerationEnabled = false;
+			codeInterpreterEnabled = false;
 		}
 
 		if ($page.url.searchParams.get('tools')) {
@@ -2251,6 +2271,11 @@
 					...($terminalServers ?? []).filter((t) => !t.id)
 				],
 				features: getFeatures(),
+				metadata: deepResearchEnabled
+					? {
+							task_type: 'deep_research'
+						}
+					: undefined,
 				variables: {
 					...getPromptVariables(
 						$user?.name,
@@ -2857,6 +2882,7 @@
 									bind:codeInterpreterEnabled
 									{pendingOAuthTools}
 									bind:webSearchEnabled
+									bind:deepResearchEnabled
 									bind:atSelectedModel
 									bind:showCommands
 									bind:dragged
@@ -2940,6 +2966,7 @@
 									bind:imageGenerationEnabled
 									bind:codeInterpreterEnabled
 									bind:webSearchEnabled
+									bind:deepResearchEnabled
 									bind:atSelectedModel
 									bind:showCommands
 									bind:dragged

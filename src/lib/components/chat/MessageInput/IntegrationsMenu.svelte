@@ -24,6 +24,7 @@
 	import Sparkles from '$lib/components/icons/Sparkles.svelte';
 	import GlobeAlt from '$lib/components/icons/GlobeAlt.svelte';
 	import Photo from '$lib/components/icons/Photo.svelte';
+	import Search from '$lib/components/icons/Search.svelte';
 	import Terminal from '$lib/components/icons/Terminal.svelte';
 	import ChevronRight from '$lib/components/icons/ChevronRight.svelte';
 	import ChevronLeft from '$lib/components/icons/ChevronLeft.svelte';
@@ -41,6 +42,8 @@
 
 	export let showWebSearchButton = false;
 	export let webSearchEnabled = false;
+	export let showDeepResearchButton = false;
+	export let deepResearchEnabled = false;
 	export let showImageGenerationButton = false;
 	export let imageGenerationEnabled = false;
 	export let showCodeInterpreterButton = false;
@@ -220,6 +223,9 @@
 								class="flex w-full justify-between gap-2 items-center px-3 py-1.5 text-sm cursor-pointer rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50"
 								on:click={() => {
 									webSearchEnabled = !webSearchEnabled;
+									if (webSearchEnabled) {
+										deepResearchEnabled = false;
+									}
 								}}
 							>
 								<div class="flex-1 truncate">
@@ -245,12 +251,53 @@
 						</Tooltip>
 					{/if}
 
+					{#if showDeepResearchButton}
+						<Tooltip
+							content="Многошаговое исследование с источниками"
+							placement="top-start"
+						>
+							<button
+								class="flex w-full justify-between gap-2 items-center px-3 py-1.5 text-sm cursor-pointer rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50"
+								on:click={() => {
+									deepResearchEnabled = !deepResearchEnabled;
+									if (deepResearchEnabled) {
+										webSearchEnabled = false;
+										imageGenerationEnabled = false;
+										codeInterpreterEnabled = false;
+									}
+								}}
+							>
+								<div class="flex-1 truncate">
+									<div class="flex flex-1 gap-2 items-center">
+										<div class="shrink-0">
+											<Search className="size-4" strokeWidth="1.75" />
+										</div>
+
+										<div class="truncate">Deep Research</div>
+									</div>
+								</div>
+
+								<div class="shrink-0">
+									<Switch
+										state={deepResearchEnabled}
+										on:change={async () => {
+											await tick();
+										}}
+									/>
+								</div>
+							</button>
+						</Tooltip>
+					{/if}
+
 					{#if showImageGenerationButton}
 						<Tooltip content={$i18n.t('Generate an image')} placement="top-start">
 							<button
 								class="flex w-full justify-between gap-2 items-center px-3 py-1.5 text-sm cursor-pointer rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50"
 								on:click={() => {
 									imageGenerationEnabled = !imageGenerationEnabled;
+									if (imageGenerationEnabled) {
+										deepResearchEnabled = false;
+									}
 								}}
 							>
 								<div class="flex-1 truncate">
@@ -286,6 +333,9 @@
 									: $i18n.t('Enable Code Interpreter')}
 								on:click={() => {
 									codeInterpreterEnabled = !codeInterpreterEnabled;
+									if (codeInterpreterEnabled) {
+										deepResearchEnabled = false;
+									}
 								}}
 							>
 								<div class="flex-1 truncate">

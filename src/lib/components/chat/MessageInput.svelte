@@ -80,6 +80,7 @@
 	import XMark from '../icons/XMark.svelte';
 	import GlobeAlt from '../icons/GlobeAlt.svelte';
 	import Photo from '../icons/Photo.svelte';
+	import Search from '../icons/Search.svelte';
 	import Wrench from '../icons/Wrench.svelte';
 	import Sparkles from '../icons/Sparkles.svelte';
 
@@ -130,6 +131,7 @@
 
 	export let imageGenerationEnabled = false;
 	export let webSearchEnabled = false;
+	export let deepResearchEnabled = false;
 	export let codeInterpreterEnabled = false;
 
 	export let pendingOAuthTools = [];
@@ -172,6 +174,7 @@
 		selectedFilterIds,
 		imageGenerationEnabled,
 		webSearchEnabled,
+		deepResearchEnabled,
 		codeInterpreterEnabled
 	});
 
@@ -534,6 +537,9 @@
 		$config?.features?.enable_web_search &&
 		($_user.role === 'admin' || $_user?.permissions?.features?.web_search);
 
+	let showDeepResearchButton = false;
+	$: showDeepResearchButton = showWebSearchButton;
+
 	let showImageGenerationButton = false;
 	$: showImageGenerationButton =
 		(atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).length ===
@@ -553,6 +559,36 @@
 	$: if ($selectedTerminalId && codeInterpreterEnabled) {
 		codeInterpreterEnabled = false;
 	}
+
+	$: if (deepResearchEnabled && webSearchEnabled) {
+		webSearchEnabled = false;
+	}
+
+	$: if (deepResearchEnabled && imageGenerationEnabled) {
+		imageGenerationEnabled = false;
+	}
+
+	$: if (deepResearchEnabled && codeInterpreterEnabled) {
+		codeInterpreterEnabled = false;
+	}
+
+	const toggleWebSearch = () => {
+		const nextState = !webSearchEnabled;
+		webSearchEnabled = nextState;
+		if (nextState) {
+			deepResearchEnabled = false;
+		}
+	};
+
+	const toggleDeepResearch = () => {
+		const nextState = !deepResearchEnabled;
+		deepResearchEnabled = nextState;
+		if (nextState) {
+			webSearchEnabled = false;
+			imageGenerationEnabled = false;
+			codeInterpreterEnabled = false;
+		}
+	};
 
 	const scrollToBottom = () => {
 		const element = document.getElementById('messages-container');
@@ -1659,6 +1695,7 @@
 															selectedFilterIds = [];
 
 															webSearchEnabled = false;
+															deepResearchEnabled = false;
 															imageGenerationEnabled = false;
 															codeInterpreterEnabled = false;
 														}
@@ -1777,11 +1814,13 @@
 											selectedModels={atSelectedModel ? [atSelectedModel.id] : selectedModels}
 											{toggleFilters}
 											{showWebSearchButton}
+											{showDeepResearchButton}
 											{showImageGenerationButton}
 											{showCodeInterpreterButton}
 											bind:selectedToolIds
 											bind:selectedFilterIds
 											bind:webSearchEnabled
+											bind:deepResearchEnabled
 											bind:imageGenerationEnabled
 											bind:codeInterpreterEnabled
 											closeOnOutsideClick={integrationsMenuCloseOnOutsideClick}
@@ -1828,6 +1867,47 @@
 									{/if}
 
 									<div class="ml-1 flex gap-1.5">
+										{#if showWebSearchButton}
+											<Tooltip content={$i18n.t('Search the internet')} placement="top">
+												<button
+													on:click|preventDefault={toggleWebSearch}
+													type="button"
+													class="group px-3 py-[7px] flex gap-1.5 items-center text-xs font-medium rounded-full transition-colors duration-300 focus:outline-hidden max-w-full overflow-hidden whitespace-nowrap {webSearchEnabled ||
+													($settings?.webSearch ?? false) === 'always'
+														? 'text-red-600 dark:text-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 border border-red-200/60 dark:border-red-400/30'
+														: 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}"
+												>
+													<GlobeAlt className="size-4" strokeWidth="1.75" />
+													<span>{$i18n.t('Web Search')}</span>
+													{#if webSearchEnabled || ($settings?.webSearch ?? false) === 'always'}
+														<div class="hidden group-hover:block">
+															<XMark className="size-4" strokeWidth="1.75" />
+														</div>
+													{/if}
+												</button>
+											</Tooltip>
+										{/if}
+
+										{#if showDeepResearchButton}
+											<Tooltip content="Многошаговое исследование с источниками" placement="top">
+												<button
+													on:click|preventDefault={toggleDeepResearch}
+													type="button"
+													class="group px-3 py-[7px] flex gap-1.5 items-center text-xs font-medium rounded-full transition-colors duration-300 focus:outline-hidden max-w-full overflow-hidden whitespace-nowrap {deepResearchEnabled
+														? 'text-red-600 dark:text-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 border border-red-200/60 dark:border-red-400/30'
+														: 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}"
+												>
+													<Search className="size-4" strokeWidth="1.75" />
+													<span>Deep Research</span>
+													{#if deepResearchEnabled}
+														<div class="hidden group-hover:block">
+															<XMark className="size-4" strokeWidth="1.75" />
+														</div>
+													{/if}
+												</button>
+											</Tooltip>
+										{/if}
+
 										{#if (selectedToolIds ?? []).length > 0}
 											<Tooltip
 												content={$i18n.t('{{COUNT}} Available Tools', {
@@ -1887,24 +1967,6 @@
 												</Tooltip>
 											{/if}
 										{/each}
-
-										{#if webSearchEnabled}
-											<Tooltip content={$i18n.t('Web Search')} placement="top">
-												<button
-													on:click|preventDefault={() => (webSearchEnabled = !webSearchEnabled)}
-													type="button"
-													class="group p-[7px] flex gap-1.5 items-center text-sm rounded-full transition-colors duration-300 focus:outline-hidden max-w-full overflow-hidden {webSearchEnabled ||
-													($settings?.webSearch ?? false) === 'always'
-														? ' text-sky-500 dark:text-sky-300 bg-sky-50 hover:bg-sky-100 dark:bg-sky-400/10 dark:hover:bg-sky-600/10 border border-sky-200/40 dark:border-sky-500/20'
-														: 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 '}"
-												>
-													<GlobeAlt className="size-4" strokeWidth="1.75" />
-													<div class="hidden group-hover:block">
-														<XMark className="size-4" strokeWidth="1.75" />
-													</div>
-												</button>
-											</Tooltip>
-										{/if}
 
 										{#if imageGenerationEnabled}
 											<Tooltip content={$i18n.t('Image')} placement="top">
