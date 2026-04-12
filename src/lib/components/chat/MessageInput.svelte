@@ -75,6 +75,7 @@
 	import FileItem from '../common/FileItem.svelte';
 	import Image from '../common/Image.svelte';
 	import Spinner from '../common/Spinner.svelte';
+	import ConfirmDialog from '../common/ConfirmDialog.svelte';
 
 	import XMark from '../icons/XMark.svelte';
 	import GlobeAlt from '../icons/GlobeAlt.svelte';
@@ -447,6 +448,10 @@
 	let inputFiles;
 
 	let showInputModal = false;
+	let showVisionModelSwitchDialog = false;
+	let selectedVisionModelId = '';
+	let pendingVisionFiles = [];
+	let pendingVisionSubmit = false;
 
 	export let dragged = false;
 	let shiftKey = false;
@@ -454,10 +459,39 @@
 	let user = null;
 	export let placeholder = '';
 
+	let configuredVisionModelIds = [];
+	$: configuredVisionModelIds = Array.from(
+		new Set([
+			...(import.meta.env.VITE_GPTHUB_VISION_MODELS ?? '')
+				.split(',')
+				.map((modelId) => modelId.trim())
+				.filter((modelId) => modelId),
+			...($models ?? [])
+				.map((model) => model?.id)
+				.filter(
+					(modelId) =>
+						typeof modelId === 'string' && /(^|[-_.])vl([-_.]|$)/i.test(modelId)
+				)
+		])
+	);
+
 	let visionCapableModels = [];
 	$: visionCapableModels = (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).filter(
-		(model) => $models.find((m) => m.id === model)?.info?.meta?.capabilities?.vision ?? true
+		(modelId) => configuredVisionModelIds.includes(modelId)
 	);
+
+	let availableVisionModels = [];
+	$: availableVisionModels = configuredVisionModelIds
+		.map((modelId) => {
+			const model = $models.find((item) => item.id === modelId);
+			return (
+				model ?? {
+					id: modelId,
+					name: modelId
+				}
+			);
+		})
+		.filter((model) => typeof model?.id === 'string' && model.id !== 'undefined');
 
 	let fileUploadCapableModels = [];
 	$: fileUploadCapableModels = (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).filter(
@@ -563,6 +597,73 @@
 		} catch (error) {
 			// Handle any errors (e.g., user cancels screen sharing)
 			console.error('Error capturing screen:', error);
+		}
+	};
+
+	const getSelectedModelIds = () => (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels);
+
+	const hasImageInput = (items = []) =>
+		items.some(
+			(file) =>
+				file?.type === 'image' ||
+				file?.type?.startsWith('image/') ||
+				(file?.content_type ?? '').startsWith('image/')
+		);
+
+	const isImageModelSelectionCompatible = () => {
+		const selectedIds = getSelectedModelIds().filter((modelId) => modelId);
+		return (
+			selectedIds.length === 1 &&
+			configuredVisionModelIds.length > 0 &&
+			configuredVisionModelIds.includes(selectedIds[0])
+		);
+	};
+
+	const resetVisionModelSwitchState = () => {
+		pendingVisionFiles = [];
+		pendingVisionSubmit = false;
+		selectedVisionModelId = '';
+	};
+
+	const openVisionModelSwitchDialog = (inputFiles = [], submitAfterSwitch = false) => {
+		if (availableVisionModels.length === 0) {
+			toast.error($i18n.t('No image-capable models are available.'));
+			return;
+		}
+
+		const selectedIds = getSelectedModelIds();
+		selectedVisionModelId =
+			selectedIds.find((modelId) => configuredVisionModelIds.includes(modelId)) ??
+			availableVisionModels[0]?.id ??
+			'';
+		pendingVisionFiles = inputFiles;
+		pendingVisionSubmit = submitAfterSwitch;
+		showVisionModelSwitchDialog = true;
+	};
+
+	const confirmVisionModelSwitch = async () => {
+		if (!selectedVisionModelId) {
+			toast.error($i18n.t('Select an image model before continuing.'));
+			resetVisionModelSwitchState();
+			return;
+		}
+
+		const targetModelId = selectedVisionModelId;
+		const filesToProcess = pendingVisionFiles;
+		const shouldSubmit = pendingVisionSubmit;
+
+		resetVisionModelSwitchState();
+		atSelectedModel = undefined;
+		selectedModels = [targetModelId];
+
+		await tick();
+
+		if (filesToProcess.length > 0) {
+			await inputFilesHandler(filesToProcess, true);
+		}
+
+		if (shouldSubmit) {
+			dispatch('submit', prompt);
 		}
 	};
 
@@ -674,8 +775,13 @@
 		}
 	};
 
-	const inputFilesHandler = async (inputFiles) => {
+	const inputFilesHandler = async (inputFiles, skipVisionModelCheck = false) => {
 		console.log('Input files handler called with:', inputFiles);
+
+		if (!skipVisionModelCheck && hasImageInput(inputFiles) && !isImageModelSelectionCompatible()) {
+			openVisionModelSwitchDialog(inputFiles, false);
+			return;
+		}
 
 		if (
 			($config?.file?.max_count ?? null) !== null &&
@@ -714,7 +820,7 @@
 			}
 
 			if (file['type'].startsWith('image/')) {
-				if (visionCapableModels.length === 0) {
+				if (!isImageModelSelectionCompatible()) {
 					toast.error($i18n.t('Selected model(s) do not support image inputs'));
 					return;
 				}
@@ -1082,6 +1188,41 @@
 
 <ToolServersModal bind:show={showTools} {selectedToolIds} />
 
+<ConfirmDialog
+	bind:show={showVisionModelSwitchDialog}
+	title={$i18n.t('Switch to an image model')}
+	message={$i18n.t('To analyze an image, switch to one of the image models below.')}
+	confirmLabel={$i18n.t('Switch model')}
+	cancelLabel={$i18n.t('Cancel')}
+	onConfirm={confirmVisionModelSwitch}
+	on:cancel={() => {
+		resetVisionModelSwitchState();
+	}}
+>
+	<div class="text-sm text-gray-500 dark:text-gray-400">
+		{$i18n.t('Choose the model that should process the image.')}
+	</div>
+
+	<div class="mt-4 flex flex-col gap-2">
+		{#each availableVisionModels as model}
+			<button
+				type="button"
+				class={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+					selectedVisionModelId === model.id
+						? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+						: 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-700'
+				}`}
+				on:click={() => {
+					selectedVisionModelId = model.id;
+				}}
+			>
+				<div class="text-sm font-medium">{model.name ?? model.id}</div>
+				<div class="mt-1 text-xs opacity-70">{model.id}</div>
+			</button>
+		{/each}
+	</div>
+</ConfirmDialog>
+
 <InputVariablesModal
 	bind:show={showInputVariablesModal}
 	variables={inputVariables}
@@ -1207,7 +1348,11 @@
 					<form
 						class="w-full flex flex-col gap-1.5 {recording ? 'hidden' : ''}"
 						on:submit|preventDefault={() => {
-							// check if selectedModels support image input
+							if (hasImageInput(files) && !isImageModelSelectionCompatible()) {
+								openVisionModelSwitchDialog([], true);
+								return;
+							}
+
 							dispatch('submit', prompt);
 						}}
 					>
@@ -1291,8 +1436,9 @@
 														<Tooltip
 															className=" absolute top-1 left-1"
 															content={$i18n.t('{{ models }}', {
-																models: [...(atSelectedModel ? [atSelectedModel] : selectedModels)]
+																models: [...(atSelectedModel ? [atSelectedModel.id] : selectedModels)]
 																	.filter((id) => !visionCapableModels.includes(id))
+																	.map((id) => $models.find((model) => model.id === id)?.name ?? id)
 																	.join(', ')
 															})}
 														>

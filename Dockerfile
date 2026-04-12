@@ -17,6 +17,7 @@ ARG USE_AUXILIARY_EMBEDDING_MODEL=TaylorAI/bge-micro-v2
 
 # Tiktoken encoding name; models to use can be found at https://huggingface.co/models?library=tiktoken
 ARG USE_TIKTOKEN_ENCODING_NAME="cl100k_base"
+ARG VITE_GPTHUB_VISION_MODELS=""
 
 ARG BUILD_HASH=dev-build
 # Override at your own risk - non-root configurations are untested
@@ -26,9 +27,10 @@ ARG GID=0
 ######## WebUI frontend ########
 FROM --platform=$BUILDPLATFORM node:22-alpine3.20 AS build
 ARG BUILD_HASH
+ARG VITE_GPTHUB_VISION_MODELS
 
 # Set Node.js options (heap limit Allocation failed - JavaScript heap out of memory)
-# ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV NODE_OPTIONS="--max-old-space-size=6144"
 
 WORKDIR /app
 
@@ -40,6 +42,7 @@ RUN npm ci --force
 
 COPY . .
 ENV APP_BUILD_HASH=${BUILD_HASH}
+ENV VITE_GPTHUB_VISION_MODELS=${VITE_GPTHUB_VISION_MODELS}
 RUN npm run build
 
 ######## WebUI backend ########

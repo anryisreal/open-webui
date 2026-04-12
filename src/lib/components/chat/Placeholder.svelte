@@ -207,7 +207,7 @@
 				<MessageInput
 					bind:this={messageInput}
 					{history}
-					{selectedModels}
+					bind:selectedModels
 					bind:files
 					bind:prompt
 					bind:autoScroll
