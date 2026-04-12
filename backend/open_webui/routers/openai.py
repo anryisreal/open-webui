@@ -1161,6 +1161,9 @@ async def generate_chat_completion(
                     part.get('text', '') for part in message['content'] if part.get('type') in ('input_text', 'text')
                 )
 
+    if metadata:
+        payload['metadata'] = metadata
+
     payload = json.dumps(payload)
 
     r = None
