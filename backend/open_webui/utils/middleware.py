@@ -27,7 +27,7 @@ from starlette.responses import Response, StreamingResponse, JSONResponse
 
 from open_webui.utils.misc import is_string_allowed
 from open_webui.models.oauth_sessions import OAuthSessions
-from open_webui.models.chats import Chats
+from open_webui.models.chats import Chats, sanitize_generated_title_text
 from open_webui.models.folders import Folders
 from open_webui.models.users import Users
 from open_webui.socket.main import (
@@ -2989,6 +2989,8 @@ async def background_tasks_handler(ctx):
                             if not title:
                                 title = messages[0].get('content', user_message)
 
+                            title = sanitize_generated_title_text(title)
+
                             Chats.update_chat_title_by_id(metadata['chat_id'], title)
 
                             await event_emitter(
@@ -2999,7 +3001,7 @@ async def background_tasks_handler(ctx):
                             )
 
                     if title == None and len(messages) == 2 and (not messages_map or len(messages_map) <= 2):
-                        title = messages[0].get('content', user_message)
+                        title = sanitize_generated_title_text(messages[0].get('content', user_message))
 
                         Chats.update_chat_title_by_id(metadata['chat_id'], title)
 

@@ -1,5 +1,6 @@
 import logging
 import json
+import re
 import time
 import uuid
 from typing import Optional
@@ -34,6 +35,32 @@ from sqlalchemy.sql.expression import bindparam
 ####################
 
 log = logging.getLogger(__name__)
+
+EMOJI_PATTERN = re.compile(
+    '['
+    '\U0001F1E6-\U0001F1FF'
+    '\U0001F300-\U0001F5FF'
+    '\U0001F600-\U0001F64F'
+    '\U0001F680-\U0001F6FF'
+    '\U0001F700-\U0001F77F'
+    '\U0001F780-\U0001F7FF'
+    '\U0001F800-\U0001F8FF'
+    '\U0001F900-\U0001F9FF'
+    '\U0001FA00-\U0001FAFF'
+    '\u2600-\u26FF'
+    '\u2700-\u27BF'
+    ']+',
+    flags=re.UNICODE,
+)
+EMOJI_AUX_PATTERN = re.compile(r'[\u200d\ufe0f]+', flags=re.UNICODE)
+
+
+def sanitize_generated_title_text(value: Optional[str]) -> str:
+    text = sanitize_text_for_db(value or '')
+    text = EMOJI_PATTERN.sub(' ', text)
+    text = EMOJI_AUX_PATTERN.sub('', text)
+    text = re.sub(r'\s+', ' ', text).strip(" \t\r\n-–—:|,.;")
+    return text or 'New Chat'
 
 
 class Chat(Base):
@@ -259,6 +286,9 @@ class ChatTable:
         """Recursively remove null bytes from strings in dict/list structures."""
         return sanitize_data_for_db(obj)
 
+    def _clean_title(self, title: Optional[str]) -> str:
+        return sanitize_generated_title_text(self._clean_null_bytes(title or ''))
+
     def _sanitize_chat_row(self, chat_item):
         """
         Clean a Chat SQLAlchemy model's title + chat JSON,
@@ -268,7 +298,7 @@ class ChatTable:
 
         # Clean title
         if chat_item.title:
-            cleaned = self._clean_null_bytes(chat_item.title)
+            cleaned = self._clean_title(chat_item.title)
             if cleaned != chat_item.title:
                 chat_item.title = cleaned
                 changed = True
@@ -289,9 +319,7 @@ class ChatTable:
                 **{
                     'id': id,
                     'user_id': user_id,
-                    'title': self._clean_null_bytes(
-                        form_data.chat['title'] if 'title' in form_data.chat else 'New Chat'
-                    ),
+                    'title': self._clean_title(form_data.chat['title'] if 'title' in form_data.chat else 'New Chat'),
                     'chat': self._clean_null_bytes(form_data.chat),
                     'folder_id': form_data.folder_id,
                     'created_at': int(time.time()),
@@ -327,7 +355,7 @@ class ChatTable:
             **{
                 'id': id,
                 'user_id': user_id,
-                'title': self._clean_null_bytes(form_data.chat['title'] if 'title' in form_data.chat else 'New Chat'),
+                'title': self._clean_title(form_data.chat['title'] if 'title' in form_data.chat else 'New Chat'),
                 'chat': self._clean_null_bytes(form_data.chat),
                 'meta': form_data.meta,
                 'pinned': form_data.pinned,
@@ -377,7 +405,7 @@ class ChatTable:
             with get_db_context(db) as db:
                 chat_item = db.get(Chat, id)
                 chat_item.chat = self._clean_null_bytes(chat)
-                chat_item.title = self._clean_null_bytes(chat['title']) if 'title' in chat else 'New Chat'
+                chat_item.title = self._clean_title(chat['title']) if 'title' in chat else 'New Chat'
 
                 chat_item.updated_at = int(time.time())
 
@@ -394,7 +422,7 @@ class ChatTable:
             return None
 
         chat = chat.chat
-        chat['title'] = title
+        chat['title'] = self._clean_title(title)
 
         return self.update_chat_by_id(id, chat)
 
@@ -428,7 +456,7 @@ class ChatTable:
             result = db.query(Chat.title).filter_by(id=id).first()
             if result is None:
                 return None
-            return result[0] or 'New Chat'
+            return self._clean_title(result[0] or 'New Chat')
 
     def get_messages_map_by_chat_id(self, id: str) -> Optional[dict]:
         chat = self.get_chat_by_id(id)
@@ -693,7 +721,7 @@ class ChatTable:
                 ChatTitleIdResponse.model_validate(
                     {
                         'id': chat[0],
-                        'title': chat[1],
+                        'title': self._clean_title(chat[1]),
                         'updated_at': chat[2],
                         'created_at': chat[3],
                     }
@@ -753,7 +781,7 @@ class ChatTable:
                 SharedChatResponse.model_validate(
                     {
                         'id': chat[0],
-                        'title': chat[1],
+                        'title': self._clean_title(chat[1]),
                         'share_id': chat[2],
                         'updated_at': chat[3],
                         'created_at': chat[4],
@@ -840,7 +868,7 @@ class ChatTable:
                 ChatTitleIdResponse.model_validate(
                     {
                         'id': chat[0],
-                        'title': chat[1],
+                        'title': self._clean_title(chat[1]),
                         'updated_at': chat[2],
                         'created_at': chat[3],
                     }
@@ -992,7 +1020,7 @@ class ChatTable:
                 ChatTitleIdResponse.model_validate(
                     {
                         'id': chat[0],
-                        'title': chat[1],
+                        'title': self._clean_title(chat[1]),
                         'updated_at': chat[2],
                         'created_at': chat[3],
                     }

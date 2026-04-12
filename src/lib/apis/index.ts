@@ -670,6 +670,14 @@ export const generateTitle = async (
 		throw error;
 	}
 
+	const sanitizeGeneratedTitle = (value: string) =>
+		value
+			.replace(/[\u200D\uFE0F]/gu, '')
+			.replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ')
+			.replace(/\s+/g, ' ')
+			.trim()
+			.replace(/^[\s\-–—:|,.;]+|[\s\-–—:|,.;]+$/g, '') || 'New Chat';
+
 	try {
 		// Step 1: Safely extract the response string
 		const response = res?.choices[0]?.message?.content ?? '';
@@ -690,7 +698,7 @@ export const generateTitle = async (
 
 			// Step 6: If there's a "tags" key, return the tags array; otherwise, return an empty array
 			if (parsed && parsed.title) {
-				return parsed.title;
+				return sanitizeGeneratedTitle(parsed.title);
 			} else {
 				return null;
 			}
