@@ -23,6 +23,7 @@ from open_webui.utils.plugin import (
     get_function_module_from_cache,
 )
 from open_webui.utils.access_control import has_access
+from open_webui.utils.gpthub import is_auto_model
 
 
 from open_webui.config import (
@@ -378,6 +379,9 @@ async def get_all_models(request, refresh: bool = False, user: UserModel = None)
 
 
 def check_model_access(user, model, db=None):
+    if is_auto_model(model.get('id')):
+        return
+
     if model.get('arena'):
         meta = model.get('info', {}).get('meta', {})
         access_grants = meta.get('access_grants', [])
@@ -432,6 +436,10 @@ def get_filtered_models(models, user, db=None):
 
         filtered_models = []
         for model in models:
+            if is_auto_model(model.get('id')):
+                filtered_models.append(model)
+                continue
+
             if model.get('arena'):
                 meta = model.get('info', {}).get('meta', {})
                 access_grants = meta.get('access_grants', [])

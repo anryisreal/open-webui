@@ -57,6 +57,7 @@ from open_webui.utils.misc import (
 )
 
 from open_webui.utils.auth import get_admin_user, get_verified_user
+from open_webui.utils.gpthub import AUTO_MODEL_ID, build_auto_model, is_auto_model
 from open_webui.utils.headers import include_user_info_headers
 from open_webui.utils.anthropic import is_anthropic_url, get_anthropic_models
 
@@ -537,6 +538,8 @@ async def get_all_models(request: Request, user: UserModel) -> dict[str, list]:
         return models
 
     models = get_merged_models(map(extract_data, responses))
+    if api_base_urls:
+        models[AUTO_MODEL_ID] = build_auto_model(url_idx=0)
     log.debug(f'models: {models}')
 
     request.app.state.OPENAI_MODELS = models
@@ -1024,7 +1027,8 @@ async def generate_chat_completion(
     metadata = payload.pop('metadata', None)
 
     model_id = form_data.get('model')
-    model_info = Models.get_model_by_id(model_id)
+    auto_model = is_auto_model(model_id)
+    model_info = None if auto_model else Models.get_model_by_id(model_id)
 
     # Check model info and override the payload
     if model_info:
@@ -1061,7 +1065,7 @@ async def generate_chat_completion(
                     status_code=403,
                     detail='Model not found',
                 )
-    elif not bypass_filter:
+    elif not auto_model and not bypass_filter:
         if user.role != 'admin':
             raise HTTPException(
                 status_code=403,
@@ -1070,10 +1074,10 @@ async def generate_chat_completion(
 
     # Check if model is already in app state cache to avoid expensive get_all_models() call
     models = request.app.state.OPENAI_MODELS
-    if not models or model_id not in models:
+    if not models or (model_id not in models and not auto_model):
         await get_all_models(request, user=user)
         models = request.app.state.OPENAI_MODELS
-    model = models.get(model_id)
+    model = build_auto_model(url_idx=0) if auto_model else models.get(model_id)
 
     if model:
         idx = model['urlIdx']

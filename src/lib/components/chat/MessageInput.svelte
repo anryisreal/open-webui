@@ -461,6 +461,8 @@
 
 	let user = null;
 	export let placeholder = '';
+	const AUTO_MODEL_ID = 'auto';
+	const isAutoModelId = (modelId) => modelId === AUTO_MODEL_ID;
 
 	let configuredVisionModelIds = [];
 	$: configuredVisionModelIds = Array.from(
@@ -480,7 +482,7 @@
 
 	let visionCapableModels = [];
 	$: visionCapableModels = (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).filter(
-		(modelId) => configuredVisionModelIds.includes(modelId)
+		(modelId) => isAutoModelId(modelId) || configuredVisionModelIds.includes(modelId)
 	);
 
 	let availableVisionModels = [];
@@ -646,8 +648,8 @@
 		const selectedIds = getSelectedModelIds().filter((modelId) => modelId);
 		return (
 			selectedIds.length === 1 &&
-			configuredVisionModelIds.length > 0 &&
-			configuredVisionModelIds.includes(selectedIds[0])
+			(isAutoModelId(selectedIds[0]) ||
+				(configuredVisionModelIds.length > 0 && configuredVisionModelIds.includes(selectedIds[0])))
 		);
 	};
 
