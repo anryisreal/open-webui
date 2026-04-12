@@ -2051,19 +2051,8 @@
 					($user?.role === 'admin' || $user?.permissions?.features?.code_interpreter)
 						? codeInterpreterEnabled
 						: false,
-				web_search: webSearchEnabled
+				web_search: false
 			};
-
-		const currentModels = atSelectedModel?.id ? [atSelectedModel.id] : selectedModels;
-		if (
-			currentModels.filter(
-				(model) => $models.find((m) => m.id === model)?.info?.meta?.capabilities?.web_search ?? true
-			).length === currentModels.length
-		) {
-			if (($settings?.webSearch ?? false) === 'always') {
-				features = { ...features, web_search: true };
-			}
-		}
 
 		if ($settings?.memory ?? false) {
 			features = { ...features, memory: true };

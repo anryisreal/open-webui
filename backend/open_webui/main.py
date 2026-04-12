@@ -1648,6 +1648,10 @@ async def chat_completion(
 
     metadata = {}
     try:
+        incoming_metadata = form_data.get('metadata', {})
+        if not isinstance(incoming_metadata, dict):
+            incoming_metadata = {}
+
         model_info = None
         if not model_item.get('direct', False):
             if model_id not in request.app.state.MODELS:
@@ -1708,6 +1712,7 @@ async def chat_completion(
             reasoning_tags = model_info_params.get('reasoning_tags')
 
         metadata = {
+            **incoming_metadata,
             'user_id': user.id,
             'chat_id': form_data.pop('chat_id', None),
             'message_id': form_data.pop('id', None),

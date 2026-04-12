@@ -2338,7 +2338,11 @@ async def process_chat_payload(request, form_data, user, metadata, model):
             if metadata.get('params', {}).get('function_calling') != 'native':
                 form_data = await chat_memory_handler(request, form_data, extra_params, user)
 
-        if 'web_search' in features and features['web_search']:
+        if (
+            'web_search' in features
+            and features['web_search']
+            and metadata.get('task_type') not in ['search', 'deep_research']
+        ):
             # Skip forced RAG web search when native FC is enabled - model can use web_search tool
             if metadata.get('params', {}).get('function_calling') != 'native':
                 form_data = await chat_web_search_handler(request, form_data, extra_params, user)
