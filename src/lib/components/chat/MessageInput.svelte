@@ -154,6 +154,35 @@
 	let selectedValvesItemId = null;
 	let integrationsMenuCloseOnOutsideClick = true;
 
+	const AUDIO_FILE_EXTENSIONS = new Set(['mp3', 'wav']);
+
+	const getFileExtension = (file) => file?.name?.split('.').pop()?.toLowerCase() ?? '';
+
+	const isAudioFile = (file) => {
+		const contentType = (file?.type ?? '').toLowerCase();
+		return contentType.startsWith('audio/') || AUDIO_FILE_EXTENSIONS.has(getFileExtension(file));
+	};
+
+	const getAudioContentType = (file) => {
+		const contentType = (file?.type ?? '').toLowerCase();
+		if (contentType === 'audio/mp3') {
+			return 'audio/mpeg';
+		}
+		if (['audio/x-wav', 'audio/wave', 'audio/vnd.wave'].includes(contentType)) {
+			return 'audio/wav';
+		}
+
+		const extension = getFileExtension(file);
+		if (extension === 'mp3') {
+			return 'audio/mpeg';
+		}
+		if (extension === 'wav') {
+			return 'audio/wav';
+		}
+
+		return contentType || 'audio/wav';
+	};
+
 	$: if (!showValvesModal) {
 		integrationsMenuCloseOnOutsideClick = true;
 	}
@@ -720,10 +749,11 @@
 
 		if (!$temporaryChatEnabled) {
 			try {
+				const audioFile = isAudioFile(file);
 				// If the file is an audio file, provide the language for STT.
 				let metadata = null;
 				if (
-					(file.type.startsWith('audio/') || file.type.startsWith('video/')) &&
+					(audioFile || (file?.type ?? '').startsWith('video/')) &&
 					$settings?.audio?.stt?.language
 				) {
 					metadata = {
@@ -731,8 +761,13 @@
 					};
 				}
 
-				// During the file upload, file content is automatically extracted.
-				const uploadedFile = await uploadFile(localStorage.token, file, metadata, process);
+				// GPTHub handles audio itself; do not force OpenWebUI RAG/STT processing here.
+				const uploadedFile = await uploadFile(
+					localStorage.token,
+					file,
+					metadata,
+					audioFile ? false : process
+				);
 
 				if (uploadedFile) {
 					console.log('File upload completed:', {
@@ -751,7 +786,9 @@
 					fileItem.id = uploadedFile.id;
 					fileItem.collection_name =
 						uploadedFile?.meta?.collection_name || uploadedFile?.collection_name;
-					fileItem.content_type = uploadedFile.meta?.content_type || uploadedFile.content_type;
+					fileItem.content_type = audioFile
+						? getAudioContentType(file)
+						: uploadedFile.meta?.content_type || uploadedFile.content_type;
 					fileItem.url = `${uploadedFile.id}`;
 
 					files = files;
@@ -764,6 +801,22 @@
 			}
 		} else {
 			// If temporary chat is enabled, we just add the file to the list without uploading it.
+			if (isAudioFile(file)) {
+				const reader = new FileReader();
+				reader.onload = (event) => {
+					fileItem.status = 'uploaded';
+					fileItem.content_type = getAudioContentType(file);
+					fileItem.url = event.target?.result;
+					fileItem.id = uuidv4();
+					files = files;
+				};
+				reader.onerror = () => {
+					toast.error($i18n.t('Failed to read the file.'));
+					files = files.filter((item) => item?.itemId !== tempItemId);
+				};
+				reader.readAsDataURL(file);
+				return;
+			}
 
 			const content = await extractContentFromFile(file).catch((error) => {
 				toast.error(

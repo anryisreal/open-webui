@@ -5,6 +5,7 @@ import sys
 import os
 import base64
 import textwrap
+import mimetypes
 
 import asyncio
 from aiocache import cached
@@ -29,7 +30,9 @@ from open_webui.utils.misc import is_string_allowed
 from open_webui.models.oauth_sessions import OAuthSessions
 from open_webui.models.chats import Chats, sanitize_generated_title_text
 from open_webui.models.folders import Folders
+from open_webui.models.files import Files
 from open_webui.models.users import Users
+from open_webui.storage.provider import Storage
 from open_webui.socket.main import (
     get_event_call,
     get_event_emitter,
@@ -106,6 +109,7 @@ from open_webui.utils.tools import (
     get_terminal_tools,
 )
 from open_webui.utils.access_control import has_connection_access
+from open_webui.utils.access_control.files import has_access_to_file
 from open_webui.utils.plugin import load_function_module_by_id
 from open_webui.utils.filter import (
     get_sorted_filter_ids,
@@ -162,6 +166,143 @@ DEFAULT_REASONING_TAGS = [
 ]
 DEFAULT_SOLUTION_TAGS = [('<|begin_of_solution|>', '<|end_of_solution|>')]
 DEFAULT_CODE_INTERPRETER_TAGS = [('<code_interpreter>', '</code_interpreter>')]
+AUDIO_ATTACHMENT_EXTENSIONS = {'mp3', 'wav'}
+AUDIO_ATTACHMENT_CONTENT_TYPES = {
+    'audio/mpeg',
+    'audio/mp3',
+    'audio/wav',
+    'audio/x-wav',
+    'audio/wave',
+    'audio/vnd.wave',
+}
+AUDIO_ATTACHMENT_CONTENT_TYPE_BY_EXTENSION = {
+    'mp3': 'audio/mpeg',
+    'wav': 'audio/wav',
+}
+
+
+def _clean_content_type(content_type: str | None) -> str:
+    if not content_type:
+        return ''
+    return content_type.split(';', 1)[0].strip().lower()
+
+
+def _file_item_name(file_item: dict, file_object=None) -> str:
+    return (
+        file_item.get('filename')
+        or file_item.get('name')
+        or (getattr(file_object, 'filename', None) if file_object else None)
+        or ''
+    )
+
+
+def _file_item_extension(file_item: dict, file_object=None) -> str:
+    name = _file_item_name(file_item, file_object)
+    return os.path.splitext(name)[1].lstrip('.').lower()
+
+
+def _file_item_content_type(file_item: dict, file_object=None) -> str:
+    nested_file = file_item.get('file') if isinstance(file_item.get('file'), dict) else {}
+    nested_meta = nested_file.get('meta') if isinstance(nested_file.get('meta'), dict) else {}
+    file_meta = getattr(file_object, 'meta', None) if file_object else None
+    file_meta = file_meta if isinstance(file_meta, dict) else {}
+
+    content_type = _clean_content_type(
+        file_item.get('content_type')
+        or file_item.get('mime_type')
+        or nested_file.get('content_type')
+        or nested_meta.get('content_type')
+        or file_meta.get('content_type')
+    )
+    if content_type == 'audio/mp3':
+        return 'audio/mpeg'
+    if content_type in {'audio/x-wav', 'audio/wave', 'audio/vnd.wave'}:
+        return 'audio/wav'
+    if content_type and content_type != 'application/octet-stream':
+        return content_type
+
+    extension = _file_item_extension(file_item, file_object)
+    if extension in AUDIO_ATTACHMENT_CONTENT_TYPE_BY_EXTENSION:
+        return AUDIO_ATTACHMENT_CONTENT_TYPE_BY_EXTENSION[extension]
+
+    guessed_content_type, _ = mimetypes.guess_type(_file_item_name(file_item, file_object))
+    return _clean_content_type(guessed_content_type) or content_type
+
+
+def _is_audio_attachment(file_item: dict, file_object=None) -> bool:
+    content_type = _file_item_content_type(file_item, file_object)
+    return (
+        content_type.startswith('audio/')
+        or content_type in AUDIO_ATTACHMENT_CONTENT_TYPES
+        or _file_item_extension(file_item, file_object) in AUDIO_ATTACHMENT_EXTENSIONS
+    )
+
+
+def _has_inline_file_data(file_item: dict) -> bool:
+    for key in ('file_data', 'data_url', 'base64', 'file_base64', 'data'):
+        if isinstance(file_item.get(key), str) and file_item.get(key):
+            return True
+    url = file_item.get('url')
+    return isinstance(url, str) and url.startswith('data:audio/')
+
+
+def _can_read_file(file_object, user: UserModel) -> bool:
+    return (
+        user.role == 'admin'
+        or file_object.user_id == user.id
+        or has_access_to_file(file_object.id, 'read', user)
+    )
+
+
+def _audio_attachment_with_data_url(file_item: dict, user: UserModel) -> dict:
+    if _has_inline_file_data(file_item):
+        content_type = _file_item_content_type(file_item) or 'audio/wav'
+        return {
+            **file_item,
+            'content_type': content_type,
+        }
+
+    file_id = file_item.get('id') or file_item.get('file_id') or file_item.get('fileId')
+    if not file_id:
+        return file_item
+
+    file_object = Files.get_file_by_id(file_id)
+    if not file_object or not file_object.path or not _is_audio_attachment(file_item, file_object):
+        return file_item
+    if not _can_read_file(file_object, user):
+        return file_item
+
+    content_type = _file_item_content_type(file_item, file_object) or 'audio/wav'
+    file_path = Storage.get_file(file_object.path)
+
+    try:
+        with open(file_path, 'rb') as audio_file:
+            encoded_audio = base64.b64encode(audio_file.read()).decode('utf-8')
+    except Exception as e:
+        log.debug(f'Failed to read audio attachment {file_id}: {e}')
+        return file_item
+
+    return {
+        **file_item,
+        'name': _file_item_name(file_item, file_object),
+        'content_type': content_type,
+        'file_data': f'data:{content_type};base64,{encoded_audio}',
+    }
+
+
+async def hydrate_audio_file_attachments(files: list | None, user: UserModel) -> list | None:
+    if not isinstance(files, list):
+        return files
+
+    hydrated_files = []
+    for file_item in files:
+        if not isinstance(file_item, dict) or not _is_audio_attachment(file_item):
+            hydrated_files.append(file_item)
+            continue
+
+        hydrated_files.append(await asyncio.to_thread(_audio_attachment_with_data_url, file_item, user))
+
+    return hydrated_files
 
 
 def output_id(prefix: str) -> str:
@@ -1874,6 +2015,13 @@ async def chat_completion_files_handler(
     sources = []
 
     if files := body.get('metadata', {}).get('files', None):
+        if not isinstance(files, list):
+            return body, {'sources': sources}
+
+        files = [item for item in files if not (isinstance(item, dict) and _is_audio_attachment(item))]
+        if not files:
+            return body, {'sources': sources}
+
         # Check if all files are in full context mode
         all_full_context = all(item.get('context') == 'full' for item in files)
 
@@ -2453,7 +2601,7 @@ async def process_chat_payload(request, form_data, user, metadata, model):
         **metadata,
         'tool_ids': tool_ids,
         'terminal_id': terminal_id,
-        'files': files,
+        'files': await hydrate_audio_file_attachments(files, user),
     }
     form_data['metadata'] = metadata
 
