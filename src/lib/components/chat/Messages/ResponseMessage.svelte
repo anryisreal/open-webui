@@ -173,6 +173,16 @@
 		(model?.info?.meta?.capabilities?.status_updates ?? true) &&
 		statusEntries.length > 0 &&
 		!(statusEntries.at(-1)?.hidden ?? false);
+	let generationNow = Date.now();
+	let generationTimerId: ReturnType<typeof setInterval> | null = null;
+	$: isGenerating = !message?.done && !message?.error;
+	$: isAwaitingFirstToken = isGenerating && !(message?.content ?? '').trim().length;
+	$: generationStartedAt = Math.max(0, (message?.timestamp ?? Math.floor(Date.now() / 1000)) * 1000);
+	$: generationElapsedSeconds = isGenerating
+		? Math.max(0, Math.floor((generationNow - generationStartedAt) / 1000))
+		: 0;
+	$: generationStatusLabel = isAwaitingFirstToken ? 'Модель думает' : 'Модель отвечает';
+	$: generationElapsedLabel = formatGenerationElapsed(generationElapsedSeconds);
 
 	let edit = false;
 	let editedContent = '';
@@ -186,6 +196,48 @@
 	let loadingSpeech = false;
 
 	let showRateComment = false;
+
+	const startGenerationTimer = () => {
+		if (typeof window === 'undefined' || generationTimerId) {
+			return;
+		}
+
+		generationNow = Date.now();
+		generationTimerId = setInterval(() => {
+			generationNow = Date.now();
+		}, 1000);
+	};
+
+	const stopGenerationTimer = () => {
+		if (!generationTimerId) {
+			return;
+		}
+
+		clearInterval(generationTimerId);
+		generationTimerId = null;
+	};
+
+	function formatGenerationElapsed(totalSeconds: number) {
+		const hours = Math.floor(totalSeconds / 3600);
+		const minutes = Math.floor((totalSeconds % 3600) / 60);
+		const seconds = totalSeconds % 60;
+
+		if (hours > 0) {
+			return `${hours} ч ${String(minutes).padStart(2, '0')} мин`;
+		}
+
+		if (minutes > 0) {
+			return `${minutes} мин ${String(seconds).padStart(2, '0')} с`;
+		}
+
+		return `${seconds} с`;
+	}
+
+	$: if (isGenerating) {
+		startGenerationTimer();
+	} else {
+		stopGenerationTimer();
+	}
 
 	const copyToClipboard = async (text) => {
 		text = removeAllDetails(text);
@@ -603,6 +655,8 @@
 	});
 
 	onDestroy(() => {
+		stopGenerationTimer();
+
 		if (buttonsContainerElement) {
 			buttonsContainerElement.removeEventListener('wheel', buttonsWheelHandler);
 		}
@@ -785,6 +839,17 @@
 							class="w-full flex flex-col relative {edit ? 'hidden' : ''}"
 							id="response-content-container"
 						>
+							{#if isGenerating}
+								<div class="mb-3 inline-flex w-fit items-center gap-2 rounded-full border border-[#d92f43]/25 bg-[#d92f43]/10 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200">
+									<div class="text-[#d92f43]">
+										<Spinner className="size-3.5" />
+									</div>
+
+									<span>{generationStatusLabel}</span>
+									<span class="text-gray-500 dark:text-gray-400">{generationElapsedLabel}</span>
+								</div>
+							{/if}
+
 							{#if message.content === '' && !message.done && !message.error && !hasVisibleStatus}
 								<Skeleton />
 							{:else if message.content && message.error !== true}
