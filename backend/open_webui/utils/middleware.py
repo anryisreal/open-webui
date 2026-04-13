@@ -263,6 +263,21 @@ def _file_item_id(file_item: dict) -> str | None:
     return file_item.get('id') or file_item.get('file_id') or file_item.get('fileId')
 
 
+def _file_item_gpthub_file_id(file_item: dict, file_object=None) -> str | None:
+    direct_file_id = (
+        file_item.get('gpthub_file_id')
+        or file_item.get('gpthubFileId')
+    )
+    if isinstance(direct_file_id, str) and direct_file_id:
+        return direct_file_id
+
+    file_meta = getattr(file_object, 'meta', None) if file_object else None
+    file_meta = file_meta if isinstance(file_meta, dict) else {}
+    file_data = file_meta.get('data') if isinstance(file_meta.get('data'), dict) else {}
+    stored_file_id = file_data.get('gpthub_file_id')
+    return stored_file_id if isinstance(stored_file_id, str) and stored_file_id else None
+
+
 def _can_read_file(file_object, user: UserModel) -> bool:
     return (
         user.role == 'admin'
@@ -365,6 +380,37 @@ async def has_audio_file_attachments(files: list | None, user: UserModel) -> boo
             return True
 
     return False
+
+
+async def resolve_audio_gpthub_file_id(files: list | None, user: UserModel) -> str | None:
+    if not isinstance(files, list):
+        return None
+
+    for file_item in files:
+        if not isinstance(file_item, dict):
+            continue
+        if not _is_audio_attachment(file_item) and not await asyncio.to_thread(
+            _is_stored_audio_attachment, file_item, user
+        ):
+            continue
+
+        direct_file_id = _file_item_gpthub_file_id(file_item)
+        if direct_file_id:
+            return direct_file_id
+
+        file_id = _file_item_id(file_item)
+        if not file_id:
+            continue
+
+        file_object = Files.get_file_by_id(file_id)
+        if not file_object or not _can_read_file(file_object, user):
+            continue
+
+        stored_file_id = _file_item_gpthub_file_id(file_item, file_object)
+        if stored_file_id:
+            return stored_file_id
+
+    return None
 
 
 def output_id(prefix: str) -> str:
@@ -2660,14 +2706,20 @@ async def process_chat_payload(request, form_data, user, metadata, model):
         files = list({json.dumps(f, sort_keys=True): f for f in files}.values())
 
     hydrated_files = await hydrate_audio_file_attachments(files, user)
+    audio_gpthub_file_id = await resolve_audio_gpthub_file_id(hydrated_files, user)
     if await has_audio_file_attachments(hydrated_files, user):
         form_data['stream'] = False
+
+    metadata_files = hydrated_files
+    if audio_gpthub_file_id:
+        metadata_files = await filter_audio_file_attachments(hydrated_files or [], user)
 
     metadata = {
         **metadata,
         'tool_ids': tool_ids,
         'terminal_id': terminal_id,
-        'files': hydrated_files,
+        'files': metadata_files,
+        **({'file_id': audio_gpthub_file_id} if audio_gpthub_file_id else {}),
     }
     form_data['metadata'] = metadata
 
