@@ -33,7 +33,11 @@ export const SUPPORTED_FILE_TYPE = [
 	'application/x-javascript',
 	'text/markdown',
 	'audio/mpeg',
+	'audio/mp3',
 	'audio/wav',
+	'audio/x-wav',
+	'audio/wave',
+	'audio/vnd.wave',
 	'audio/ogg',
 	'audio/x-m4a'
 ];
@@ -94,7 +98,9 @@ export const SUPPORTED_FILE_EXTENSIONS = [
 	'xlsx',
 	'pptx',
 	'ppt',
-	'msg'
+	'msg',
+	'mp3',
+	'wav'
 ];
 
 export const DEFAULT_CAPABILITIES = {
