@@ -2061,6 +2061,29 @@
 			.map((token) => decodeURIComponent(JSON.parse(`"${token.replace(/"/g, '\\"')}"`)));
 	};
 
+	const isAudioAttachment = (file) => {
+		if (!file || typeof file !== 'object') {
+			return false;
+		}
+
+		const contentType = (
+			file.content_type ??
+			file.mime_type ??
+			file.file?.content_type ??
+			file.file?.meta?.content_type ??
+			''
+		)
+			.toString()
+			.toLowerCase();
+
+		if (contentType.startsWith('audio/') || contentType.startsWith('video/')) {
+			return true;
+		}
+
+		const name = (file.filename ?? file.name ?? '').toString().toLowerCase();
+		return /\.(mp3|wav|m4a|ogg|flac|aac|mp4|mpeg|mpga|webm)$/i.test(name);
+	};
+
 	const sendMessageSocket = async (model, _messages, _history, responseMessageId, _chatId) => {
 		const responseMessage = _history.messages[responseMessageId];
 		const userMessage = _history.messages[responseMessage.parentId];
@@ -2112,6 +2135,8 @@
 			$settings?.params?.stream_response ??
 			params?.stream_response ??
 			true;
+		const shouldDisableStreamForAudio = files.some((file) => isAudioAttachment(file));
+		const requestStream = shouldDisableStreamForAudio ? false : stream;
 
 		let messages = [
 			params?.system || $settings.system
@@ -2218,7 +2243,7 @@
 		const res = await generateOpenAIChatCompletion(
 			localStorage.token,
 			{
-				stream: stream,
+				stream: requestStream,
 				model: model.id,
 				messages: messages,
 				params: {
@@ -2278,7 +2303,7 @@
 					follow_up_generation: $settings?.autoFollowUps ?? true
 				},
 
-				...(stream && (model.info?.meta?.capabilities?.usage ?? false)
+				...(requestStream && (model.info?.meta?.capabilities?.usage ?? false)
 					? {
 							stream_options: {
 								include_usage: true

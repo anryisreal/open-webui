@@ -352,6 +352,21 @@ async def filter_audio_file_attachments(files: list, user: UserModel) -> list:
     return filtered_files
 
 
+async def has_audio_file_attachments(files: list | None, user: UserModel) -> bool:
+    if not isinstance(files, list):
+        return False
+
+    for file_item in files:
+        if not isinstance(file_item, dict):
+            continue
+        if _is_audio_attachment(file_item):
+            return True
+        if await asyncio.to_thread(_is_stored_audio_attachment, file_item, user):
+            return True
+
+    return False
+
+
 def output_id(prefix: str) -> str:
     """Generate OR-style ID: prefix + 24-char hex UUID."""
     return f'{prefix}_{uuid4().hex[:24]}'
@@ -2644,11 +2659,15 @@ async def process_chat_payload(request, form_data, user, metadata, model):
         # Remove duplicate files based on their content
         files = list({json.dumps(f, sort_keys=True): f for f in files}.values())
 
+    hydrated_files = await hydrate_audio_file_attachments(files, user)
+    if await has_audio_file_attachments(hydrated_files, user):
+        form_data['stream'] = False
+
     metadata = {
         **metadata,
         'tool_ids': tool_ids,
         'terminal_id': terminal_id,
-        'files': await hydrate_audio_file_attachments(files, user),
+        'files': hydrated_files,
     }
     form_data['metadata'] = metadata
 
