@@ -26,7 +26,6 @@
 	// Addons
 	let titleAutoGenerate = true;
 	let autoFollowUps = true;
-	let autoTags = true;
 
 	let responseAutoCopy = false;
 	let widescreenMode = false;
@@ -66,7 +65,6 @@
 	let ctrlEnterToSend = false;
 	let copyFormatted = false;
 
-	let temporaryChatByDefault = false;
 	let chatFadeStreamingText = true;
 	let collapseCodeBlocks = false;
 	let expandDetails = false;
@@ -85,10 +83,6 @@
 
 	// chat export
 	let stylizedPdfExport = true;
-
-	// Admin - Show Update Available Toast
-	let showUpdateToast = true;
-	let showChangelog = true;
 
 	let showEmojiInCall = false;
 	let voiceInterruption = false;
@@ -198,7 +192,6 @@
 
 	onMount(async () => {
 		titleAutoGenerate = $settings?.title?.auto ?? true;
-		autoTags = $settings?.autoTags ?? true;
 		autoFollowUps = $settings?.autoFollowUps ?? true;
 
 		highContrastMode = $settings?.highContrastMode ?? false;
@@ -207,8 +200,6 @@
 		responseAutoCopy = $settings?.responseAutoCopy ?? false;
 
 		showUsername = $settings?.showUsername ?? false;
-		showUpdateToast = $settings?.showUpdateToast ?? true;
-		showChangelog = $settings?.showChangelog ?? true;
 
 		showEmojiInCall = $settings?.showEmojiInCall ?? false;
 		voiceInterruption = $settings?.voiceInterruption ?? false;
@@ -241,7 +232,6 @@
 		splitLargeChunks = $settings?.splitLargeChunks ?? false;
 		scrollOnBranchChange = $settings?.scrollOnBranchChange ?? true;
 
-		temporaryChatByDefault = $settings?.temporaryChatByDefault ?? false;
 		chatDirection = $settings?.chatDirection ?? 'auto';
 		userLocation = $settings?.userLocation ?? false;
 		showChatTitleInTab = $settings?.showChatTitleInTab ?? true;
@@ -547,43 +537,6 @@
 			</div>
 
 			{#if $user?.role === 'admin'}
-				<div>
-					<div class=" py-0.5 flex w-full justify-between">
-						<div id="toast-notifications-label" class=" self-center text-xs">
-							{$i18n.t('Toast notifications for new updates')}
-						</div>
-
-						<div class="flex items-center gap-2 p-1">
-							<Switch
-								ariaLabelledbyId="toast-notifications-label"
-								tooltip={true}
-								bind:state={showUpdateToast}
-								on:change={() => {
-									saveSettings({ showUpdateToast });
-								}}
-							/>
-						</div>
-					</div>
-				</div>
-
-				<div>
-					<div class=" py-0.5 flex w-full justify-between">
-						<div id="whats-new-label" class=" self-center text-xs">
-							{$i18n.t(`Show "What's New" modal on login`)}
-						</div>
-
-						<div class="flex items-center gap-2 p-1">
-							<Switch
-								ariaLabelledbyId="whats-new-label"
-								tooltip={true}
-								bind:state={showChangelog}
-								on:change={() => {
-									saveSettings({ showChangelog });
-								}}
-							/>
-						</div>
-					</div>
-				</div>
 			{/if}
 
 			<div class=" my-2 text-sm font-medium">{$i18n.t('Chat')}</div>
@@ -736,27 +689,6 @@
 				</div>
 			</div>
 
-			{#if $user.role === 'admin' || $user?.permissions?.chat?.temporary}
-				<div>
-					<div class=" py-0.5 flex w-full justify-between">
-						<div id="temp-chat-default-label" class=" self-center text-xs">
-							{$i18n.t('Temporary Chat by Default')}
-						</div>
-
-						<div class="flex items-center gap-2 p-1">
-							<Switch
-								ariaLabelledbyId="temp-chat-default-label"
-								tooltip={true}
-								bind:state={temporaryChatByDefault}
-								on:change={() => {
-									saveSettings({ temporaryChatByDefault });
-								}}
-							/>
-						</div>
-					</div>
-				</div>
-			{/if}
-
 			<div>
 				<div class=" py-0.5 flex w-full justify-between">
 					<div id="fade-streaming-label" class=" self-center text-xs">
@@ -808,25 +740,6 @@
 							bind:state={autoFollowUps}
 							on:change={() => {
 								saveSettings({ autoFollowUps });
-							}}
-						/>
-					</div>
-				</div>
-			</div>
-
-			<div>
-				<div class=" py-0.5 flex w-full justify-between">
-					<div id="chat-tags-label" class=" self-center text-xs">
-						{$i18n.t('Chat Tags Auto-Generation')}
-					</div>
-
-					<div class="flex items-center gap-2 p-1">
-						<Switch
-							ariaLabelledbyId="chat-tags-label"
-							tooltip={true}
-							bind:state={autoTags}
-							on:change={() => {
-								saveSettings({ autoTags });
 							}}
 						/>
 					</div>
