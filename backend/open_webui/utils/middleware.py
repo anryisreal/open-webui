@@ -213,6 +213,7 @@ def _file_item_content_type(file_item: dict, file_object=None) -> str:
         or nested_file.get('content_type')
         or nested_meta.get('content_type')
         or file_meta.get('content_type')
+        or _inline_file_data_content_type(file_item)
     )
     if content_type == 'audio/mp3':
         return 'audio/mpeg'
@@ -238,12 +239,43 @@ def _is_audio_attachment(file_item: dict, file_object=None) -> bool:
     )
 
 
+def _inline_file_data_content_type(file_item: dict) -> str:
+    for key in ('url', 'file_data', 'data_url'):
+        value = file_item.get(key)
+        if not isinstance(value, str) or not value.startswith('data:') or ',' not in value:
+            continue
+        header = value.split(',', 1)[0]
+        if ';base64' not in header.lower():
+            continue
+        return _clean_content_type(header[5:].split(';', 1)[0])
+    return ''
+
+
 def _has_inline_file_data(file_item: dict) -> bool:
     for key in ('file_data', 'data_url', 'base64', 'file_base64', 'data'):
         if isinstance(file_item.get(key), str) and file_item.get(key):
             return True
     url = file_item.get('url')
     return isinstance(url, str) and url.startswith('data:audio/')
+
+
+def _file_item_id(file_item: dict) -> str | None:
+    return file_item.get('id') or file_item.get('file_id') or file_item.get('fileId')
+
+
+def _file_item_gpthub_file_id(file_item: dict, file_object=None) -> str | None:
+    direct_file_id = (
+        file_item.get('gpthub_file_id')
+        or file_item.get('gpthubFileId')
+    )
+    if isinstance(direct_file_id, str) and direct_file_id:
+        return direct_file_id
+
+    file_meta = getattr(file_object, 'meta', None) if file_object else None
+    file_meta = file_meta if isinstance(file_meta, dict) else {}
+    file_data = file_meta.get('data') if isinstance(file_meta.get('data'), dict) else {}
+    stored_file_id = file_data.get('gpthub_file_id')
+    return stored_file_id if isinstance(stored_file_id, str) and stored_file_id else None
 
 
 def _can_read_file(file_object, user: UserModel) -> bool:
@@ -256,13 +288,15 @@ def _can_read_file(file_object, user: UserModel) -> bool:
 
 def _audio_attachment_with_data_url(file_item: dict, user: UserModel) -> dict:
     if _has_inline_file_data(file_item):
+        if not _is_audio_attachment(file_item):
+            return file_item
         content_type = _file_item_content_type(file_item) or 'audio/wav'
         return {
             **file_item,
             'content_type': content_type,
         }
 
-    file_id = file_item.get('id') or file_item.get('file_id') or file_item.get('fileId')
+    file_id = _file_item_id(file_item)
     if not file_id:
         return file_item
 
@@ -290,19 +324,93 @@ def _audio_attachment_with_data_url(file_item: dict, user: UserModel) -> dict:
     }
 
 
+def _is_stored_audio_attachment(file_item: dict, user: UserModel) -> bool:
+    file_id = _file_item_id(file_item)
+    if not file_id:
+        return False
+
+    file_object = Files.get_file_by_id(file_id)
+    return bool(
+        file_object
+        and _is_audio_attachment(file_item, file_object)
+        and _can_read_file(file_object, user)
+    )
+
+
 async def hydrate_audio_file_attachments(files: list | None, user: UserModel) -> list | None:
     if not isinstance(files, list):
         return files
 
     hydrated_files = []
     for file_item in files:
-        if not isinstance(file_item, dict) or not _is_audio_attachment(file_item):
+        if not isinstance(file_item, dict):
             hydrated_files.append(file_item)
             continue
 
         hydrated_files.append(await asyncio.to_thread(_audio_attachment_with_data_url, file_item, user))
 
     return hydrated_files
+
+
+async def filter_audio_file_attachments(files: list, user: UserModel) -> list:
+    filtered_files = []
+    for file_item in files:
+        if not isinstance(file_item, dict):
+            filtered_files.append(file_item)
+            continue
+        if _is_audio_attachment(file_item):
+            continue
+        if await asyncio.to_thread(_is_stored_audio_attachment, file_item, user):
+            continue
+        filtered_files.append(file_item)
+
+    return filtered_files
+
+
+async def has_audio_file_attachments(files: list | None, user: UserModel) -> bool:
+    if not isinstance(files, list):
+        return False
+
+    for file_item in files:
+        if not isinstance(file_item, dict):
+            continue
+        if _is_audio_attachment(file_item):
+            return True
+        if await asyncio.to_thread(_is_stored_audio_attachment, file_item, user):
+            return True
+
+    return False
+
+
+async def resolve_audio_gpthub_file_id(files: list | None, user: UserModel) -> str | None:
+    if not isinstance(files, list):
+        return None
+
+    for file_item in files:
+        if not isinstance(file_item, dict):
+            continue
+        if not _is_audio_attachment(file_item) and not await asyncio.to_thread(
+            _is_stored_audio_attachment, file_item, user
+        ):
+            continue
+
+        direct_file_id = _file_item_gpthub_file_id(file_item)
+        if direct_file_id:
+            return direct_file_id
+
+        file_id = _file_item_id(file_item)
+        if not file_id:
+            continue
+
+        file_object = Files.get_file_by_id(file_id)
+        if not file_object or not _can_read_file(file_object, user):
+            continue
+
+        stored_file_id = _file_item_gpthub_file_id(file_item, file_object)
+        if stored_file_id:
+            return stored_file_id
+
+    return None
 
 
 def output_id(prefix: str) -> str:
@@ -2018,7 +2126,7 @@ async def chat_completion_files_handler(
         if not isinstance(files, list):
             return body, {'sources': sources}
 
-        files = [item for item in files if not (isinstance(item, dict) and _is_audio_attachment(item))]
+        files = await filter_audio_file_attachments(files, user)
         if not files:
             return body, {'sources': sources}
 
@@ -2600,11 +2708,21 @@ async def process_chat_payload(request, form_data, user, metadata, model):
         # Remove duplicate files based on their content
         files = list({json.dumps(f, sort_keys=True): f for f in files}.values())
 
+    hydrated_files = await hydrate_audio_file_attachments(files, user)
+    audio_gpthub_file_id = await resolve_audio_gpthub_file_id(hydrated_files, user)
+    if await has_audio_file_attachments(hydrated_files, user):
+        form_data['stream'] = False
+
+    metadata_files = hydrated_files
+    if audio_gpthub_file_id:
+        metadata_files = await filter_audio_file_attachments(hydrated_files or [], user)
+
     metadata = {
         **metadata,
         'tool_ids': tool_ids,
         'terminal_id': terminal_id,
-        'files': await hydrate_audio_file_attachments(files, user),
+        'files': metadata_files,
+        **({'file_id': audio_gpthub_file_id} if audio_gpthub_file_id else {}),
     }
     form_data['metadata'] = metadata
 

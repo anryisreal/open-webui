@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
 import asyncio
+import httpx
 
 from fastapi import (
     BackgroundTasks,
@@ -86,6 +87,47 @@ def _is_text_file(file_path: str, chunk_size: int = 8192) -> bool:
         return True
     except (UnicodeDecodeError, Exception):
         return False
+
+
+def _gpthub_base_url(request: Request) -> Optional[str]:
+    api_base_urls = getattr(request.app.state.config, 'OPENAI_API_BASE_URLS', []) or []
+    if not api_base_urls:
+        return None
+    return api_base_urls[0].rstrip('/')
+
+
+def _is_audio_content_type(content_type: Optional[str]) -> bool:
+    return isinstance(content_type, str) and content_type.lower().startswith('audio/')
+
+
+async def _upload_audio_file_to_gpthub(
+    request: Request,
+    *,
+    filename: str,
+    content: bytes,
+    content_type: Optional[str],
+    user,
+) -> Optional[str]:
+    base_url = _gpthub_base_url(request)
+    if not base_url:
+        return None
+
+    resolved_content_type = (
+        content_type if isinstance(content_type, str) and content_type else 'audio/mpeg'
+    )
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f'{base_url}/files',
+                headers={'x-user-id': user.id},
+                files={'file': (filename, content, resolved_content_type)},
+            )
+        response.raise_for_status()
+        payload = response.json()
+        return payload.get('file_id')
+    except Exception as exc:
+        log.warning(f'Failed to upload audio file to GPTHub backend: {exc}')
+        return None
 
 
 def process_uploaded_file(
@@ -256,6 +298,29 @@ def upload_file_handler(
             ),
             db=db,
         )
+
+        if file_item and _is_audio_content_type(file.content_type):
+            gpthub_file_id = asyncio.run(
+                _upload_audio_file_to_gpthub(
+                    request,
+                    filename=name,
+                    content=contents,
+                    content_type=file.content_type,
+                    user=user,
+                )
+            )
+            if gpthub_file_id:
+                file_metadata = {
+                    **file_metadata,
+                    'gpthub_file_id': gpthub_file_id,
+                }
+                file_item = Files.update_file_metadata_by_id(
+                    file_item.id,
+                    {
+                        'data': file_metadata,
+                    },
+                    db=db,
+                ) or file_item
 
         if 'channel_id' in file_metadata:
             channel = Channels.get_channel_by_id_and_user_id(file_metadata['channel_id'], user.id, db=db)
