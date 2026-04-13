@@ -386,7 +386,7 @@ async def resolve_audio_gpthub_file_id(files: list | None, user: UserModel) -> s
     if not isinstance(files, list):
         return None
 
-    for file_item in files:
+    for file_item in reversed(files):
         if not isinstance(file_item, dict):
             continue
         if not _is_audio_attachment(file_item) and not await asyncio.to_thread(
