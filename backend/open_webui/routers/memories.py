@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import logging
 import asyncio
 from typing import Optional
+import httpx
 
 from open_webui.models.memories import Memories, MemoryModel
 from open_webui.retrieval.vector.factory import VECTOR_DB_CLIENT
@@ -12,10 +13,59 @@ from sqlalchemy.orm import Session
 
 from open_webui.utils.access_control import has_permission
 from open_webui.constants import ERROR_MESSAGES
+from open_webui.env import ENABLE_FORWARD_USER_INFO_HEADERS
+from open_webui.utils.headers import include_user_info_headers
 
 log = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _gpthub_base_url(request: Request) -> str:
+    api_base_urls = getattr(request.app.state.config, 'OPENAI_API_BASE_URLS', []) or []
+    if not api_base_urls:
+        raise HTTPException(status_code=503, detail='GPTHub backend is not configured')
+    return api_base_urls[0].rstrip('/')
+
+
+def _gpthub_headers(user) -> dict:
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+    }
+    if ENABLE_FORWARD_USER_INFO_HEADERS and user:
+        headers = include_user_info_headers(headers, user)
+    return headers
+
+
+async def _gpthub_request(
+    request: Request,
+    *,
+    method: str,
+    path: str,
+    user,
+    payload: dict | None = None,
+):
+    base_url = _gpthub_base_url(request)
+    async with httpx.AsyncClient() as client:
+        response = await client.request(
+            method,
+            f'{base_url}{path}',
+            headers=_gpthub_headers(user),
+            json=payload,
+            timeout=30.0,
+        )
+    if response.status_code >= 400:
+        detail = response.text
+        try:
+            payload = response.json()
+            detail = payload.get('detail', detail)
+        except Exception:
+            pass
+        raise HTTPException(status_code=response.status_code, detail=detail)
+    if not response.content:
+        return None
+    return response.json()
 
 
 ############################
@@ -43,7 +93,12 @@ async def get_memories(
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
         )
 
-    return Memories.get_memories_by_user_id(user.id, db=db)
+    return await _gpthub_request(
+        request,
+        method='GET',
+        path='/memory/manage',
+        user=user,
+    )
 
 
 ############################
@@ -81,23 +136,13 @@ async def add_memory(
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
         )
 
-    memory = Memories.insert_new_memory(user.id, form_data.content)
-
-    vector = await request.app.state.EMBEDDING_FUNCTION(memory.content, user=user)
-
-    VECTOR_DB_CLIENT.upsert(
-        collection_name=f'user-memory-{user.id}',
-        items=[
-            {
-                'id': memory.id,
-                'text': memory.content,
-                'vector': vector,
-                'metadata': {'created_at': memory.created_at},
-            }
-        ],
+    return await _gpthub_request(
+        request,
+        method='POST',
+        path='/memory/manage',
+        user=user,
+        payload={'content': form_data.content},
     )
-
-    return memory
 
 
 ############################
@@ -226,16 +271,12 @@ async def delete_memory_by_user_id(
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
         )
 
-    result = Memories.delete_memories_by_user_id(user.id, db=db)
-
-    if result:
-        try:
-            VECTOR_DB_CLIENT.delete_collection(f'user-memory-{user.id}')
-        except Exception as e:
-            log.error(e)
-        return True
-
-    return False
+    return await _gpthub_request(
+        request,
+        method='DELETE',
+        path='/memory/manage',
+        user=user,
+    )
 
 
 ############################
@@ -266,29 +307,13 @@ async def update_memory_by_id(
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
         )
 
-    memory = Memories.update_memory_by_id_and_user_id(memory_id, user.id, form_data.content)
-    if memory is None:
-        raise HTTPException(status_code=404, detail='Memory not found')
-
-    if form_data.content is not None:
-        vector = await request.app.state.EMBEDDING_FUNCTION(memory.content, user=user)
-
-        VECTOR_DB_CLIENT.upsert(
-            collection_name=f'user-memory-{user.id}',
-            items=[
-                {
-                    'id': memory.id,
-                    'text': memory.content,
-                    'vector': vector,
-                    'metadata': {
-                        'created_at': memory.created_at,
-                        'updated_at': memory.updated_at,
-                    },
-                }
-            ],
-        )
-
-    return memory
+    return await _gpthub_request(
+        request,
+        method='POST',
+        path=f'/memory/manage/{memory_id}/update',
+        user=user,
+        payload={'content': form_data.content or ''},
+    )
 
 
 ############################
@@ -315,10 +340,9 @@ async def delete_memory_by_id(
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
         )
 
-    result = Memories.delete_memory_by_id_and_user_id(memory_id, user.id, db=db)
-
-    if result:
-        VECTOR_DB_CLIENT.delete(collection_name=f'user-memory-{user.id}', ids=[memory_id])
-        return True
-
-    return False
+    return await _gpthub_request(
+        request,
+        method='DELETE',
+        path=f'/memory/manage/{memory_id}',
+        user=user,
+    )
