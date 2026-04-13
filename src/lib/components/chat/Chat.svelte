@@ -351,10 +351,6 @@
 					imageGenerationEnabled = model.info.meta.defaultFeatureIds.includes('image_generation');
 				}
 
-				if (model.info?.meta?.capabilities?.['web_search']) {
-					webSearchEnabled = model.info.meta.defaultFeatureIds.includes('web_search');
-				}
-
 				if (
 					model.info?.meta?.capabilities?.['code_interpreter'] &&
 					$config?.features?.enable_code_interpreter &&
@@ -1166,10 +1162,6 @@
 
 		if ($page.url.searchParams.get('load-url')) {
 			await uploadWeb($page.url.searchParams.get('load-url'));
-		}
-
-		if ($page.url.searchParams.get('web-search') === 'true') {
-			webSearchEnabled = true;
 		}
 
 		if ($page.url.searchParams.get('deep-research') === 'true') {
@@ -2256,11 +2248,7 @@
 					? {
 							task_type: 'deep_research'
 						}
-					: webSearchEnabled
-						? {
-								task_type: 'search'
-							}
-						: undefined,
+					: undefined,
 				variables: {
 					...getPromptVariables(
 						$user?.name,

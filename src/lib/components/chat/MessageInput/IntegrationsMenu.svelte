@@ -22,7 +22,6 @@
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import Wrench from '$lib/components/icons/Wrench.svelte';
 	import Sparkles from '$lib/components/icons/Sparkles.svelte';
-	import GlobeAlt from '$lib/components/icons/GlobeAlt.svelte';
 	import Photo from '$lib/components/icons/Photo.svelte';
 	import Search from '$lib/components/icons/Search.svelte';
 	import Terminal from '$lib/components/icons/Terminal.svelte';
@@ -40,8 +39,6 @@
 		[];
 	export let selectedFilterIds: string[] = [];
 
-	export let showWebSearchButton = false;
-	export let webSearchEnabled = false;
 	export let showDeepResearchButton = false;
 	export let deepResearchEnabled = false;
 	export let showImageGenerationButton = false;
@@ -217,39 +214,6 @@
 						{/each}
 					{/if}
 
-					{#if showWebSearchButton}
-						<Tooltip content={$i18n.t('Search the internet')} placement="top-start">
-							<button
-								class="flex w-full justify-between gap-2 items-center px-3 py-1.5 text-sm cursor-pointer rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50"
-								on:click={() => {
-									webSearchEnabled = !webSearchEnabled;
-									if (webSearchEnabled) {
-										deepResearchEnabled = false;
-									}
-								}}
-							>
-								<div class="flex-1 truncate">
-									<div class="flex flex-1 gap-2 items-center">
-										<div class="shrink-0">
-											<GlobeAlt />
-										</div>
-
-										<div class=" truncate">{$i18n.t('Web Search')}</div>
-									</div>
-								</div>
-
-								<div class=" shrink-0">
-									<Switch
-										state={webSearchEnabled}
-										on:change={async (e) => {
-											const state = e.detail;
-											await tick();
-										}}
-									/>
-								</div>
-							</button>
-						</Tooltip>
-					{/if}
 
 					{#if showDeepResearchButton}
 						<Tooltip
@@ -261,7 +225,6 @@
 								on:click={() => {
 									deepResearchEnabled = !deepResearchEnabled;
 									if (deepResearchEnabled) {
-										webSearchEnabled = false;
 										imageGenerationEnabled = false;
 										codeInterpreterEnabled = false;
 									}

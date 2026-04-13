@@ -78,7 +78,6 @@
 	import ConfirmDialog from '../common/ConfirmDialog.svelte';
 
 	import XMark from '../icons/XMark.svelte';
-	import GlobeAlt from '../icons/GlobeAlt.svelte';
 	import Photo from '../icons/Photo.svelte';
 	import Search from '../icons/Search.svelte';
 	import Wrench from '../icons/Wrench.svelte';
@@ -532,9 +531,6 @@
 	let showToolsButton = false;
 	$: showToolsButton = ($tools ?? []).length > 0 || ($toolServers ?? []).length > 0;
 
-	let showWebSearchButton = false;
-	$: showWebSearchButton = (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).length > 0;
-
 	let showDeepResearchButton = false;
 	$: showDeepResearchButton = (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).length > 0;
 
@@ -558,10 +554,6 @@
 		codeInterpreterEnabled = false;
 	}
 
-	$: if (deepResearchEnabled && webSearchEnabled) {
-		webSearchEnabled = false;
-	}
-
 	$: if (deepResearchEnabled && imageGenerationEnabled) {
 		imageGenerationEnabled = false;
 	}
@@ -569,14 +561,6 @@
 	$: if (deepResearchEnabled && codeInterpreterEnabled) {
 		codeInterpreterEnabled = false;
 	}
-
-	const toggleWebSearch = () => {
-		const nextState = !webSearchEnabled;
-		webSearchEnabled = nextState;
-		if (nextState) {
-			deepResearchEnabled = false;
-		}
-	};
 
 	const toggleDeepResearch = () => {
 		const nextState = !deepResearchEnabled;
@@ -1803,7 +1787,7 @@
 										</div>
 									</InputMenu>
 
-									{#if showWebSearchButton || showImageGenerationButton || showCodeInterpreterButton || showToolsButton || (toggleFilters && toggleFilters.length > 0)}
+									{#if showDeepResearchButton || showImageGenerationButton || showCodeInterpreterButton || showToolsButton || (toggleFilters && toggleFilters.length > 0)}
 										<div
 											class="flex self-center w-[1px] h-4 mx-1 bg-gray-200/50 dark:bg-gray-800/50"
 										/>
@@ -1811,13 +1795,11 @@
 										<IntegrationsMenu
 											selectedModels={atSelectedModel ? [atSelectedModel.id] : selectedModels}
 											{toggleFilters}
-											{showWebSearchButton}
 											{showDeepResearchButton}
 											{showImageGenerationButton}
 											{showCodeInterpreterButton}
 											bind:selectedToolIds
 											bind:selectedFilterIds
-											bind:webSearchEnabled
 											bind:deepResearchEnabled
 											bind:imageGenerationEnabled
 											bind:codeInterpreterEnabled
@@ -1865,27 +1847,6 @@
 									{/if}
 
 									<div class="ml-1 flex gap-1.5">
-										{#if showWebSearchButton}
-											<Tooltip content={$i18n.t('Search the internet')} placement="top">
-												<button
-													on:click|preventDefault={toggleWebSearch}
-													type="button"
-													class="group px-3 py-[7px] flex gap-1.5 items-center text-xs font-medium rounded-full transition-colors duration-300 focus:outline-hidden max-w-full overflow-hidden whitespace-nowrap {webSearchEnabled ||
-													($settings?.webSearch ?? false) === 'always'
-														? 'text-red-600 dark:text-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 border border-red-200/60 dark:border-red-400/30'
-														: 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}"
-												>
-													<GlobeAlt className="size-4" strokeWidth="1.75" />
-													<span>{$i18n.t('Web Search')}</span>
-													{#if webSearchEnabled || ($settings?.webSearch ?? false) === 'always'}
-														<div class="hidden group-hover:block">
-															<XMark className="size-4" strokeWidth="1.75" />
-														</div>
-													{/if}
-												</button>
-											</Tooltip>
-										{/if}
-
 										{#if showDeepResearchButton}
 											<Tooltip content="Многошаговое исследование с источниками" placement="top">
 												<button
