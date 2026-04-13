@@ -2043,12 +2043,9 @@
 					($user?.role === 'admin' || $user?.permissions?.features?.code_interpreter)
 						? codeInterpreterEnabled
 						: false,
-				web_search: false
+				web_search: false,
+				memory: !!($settings?.memory ?? true)
 			};
-
-		if ($settings?.memory ?? false) {
-			features = { ...features, memory: true };
-		}
 
 		return features;
 	};
