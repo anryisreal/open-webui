@@ -2574,7 +2574,10 @@ async def process_chat_payload(request, form_data, user, metadata, model):
     except Exception as e:
         raise Exception(f'{e}')
 
-    features = form_data.pop('features', None) or {}
+    forwarded_features = form_data.pop('features', None) or {}
+    features = {**forwarded_features}
+    if 'memory' in features:
+        features['memory'] = False
     extra_params['__features__'] = features
     if features:
         if 'voice' in features and features['voice']:
@@ -3014,6 +3017,7 @@ async def process_chat_payload(request, form_data, user, metadata, model):
     # to prevent template parsing errors with strict chat templates (e.g. Qwen)
     form_data['messages'] = merge_system_messages(form_data.get('messages', []))
 
+    form_data['features'] = forwarded_features
     return form_data, metadata, events
 
 
