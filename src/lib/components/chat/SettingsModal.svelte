@@ -216,6 +216,7 @@
 				'webhookurl'
 			]
 		},
+		}
 	];
 
 	let availableSettings = [];

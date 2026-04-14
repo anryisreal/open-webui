@@ -2079,6 +2079,8 @@
 		return /\.(mp3|wav|m4a|ogg|flac|aac|mp4|mpeg|mpga|webm)$/i.test(name);
 	};
 
+	const isPersistentChatFile = (file) => !isAudioAttachment(file);
+
 	const sendMessageSocket = async (model, _messages, _history, responseMessageId, _chatId) => {
 		const responseMessage = _history.messages[responseMessageId];
 		const userMessage = _history.messages[responseMessage.parentId];
@@ -2093,7 +2095,7 @@
 			return fileExists;
 		});
 
-		let files = structuredClone(chatFiles);
+		let files = structuredClone(chatFiles).filter((item) => isPersistentChatFile(item));
 		files.push(
 			...(userMessage?.files ?? []).filter(
 				(item) =>
