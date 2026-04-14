@@ -71,7 +71,6 @@
 	let files = null;
 
 	let copied = false;
-	let saved = false;
 
 	$: languageLabel = ((lang || 'code').trim() || 'code').toLowerCase();
 
@@ -80,14 +79,12 @@
 	};
 
 	const saveCode = () => {
-		saved = true;
+		if (!save) {
+			return;
+		}
 
 		code = _code;
 		onSave(code);
-
-		setTimeout(() => {
-			saved = false;
-		}, 1000);
 	};
 
 	const copyCode = async () => {
@@ -529,16 +526,6 @@
 								</div>
 							</button>
 						{/if}
-					{/if}
-
-					{#if save}
-						<button
-							type="button"
-							class="gpthub-code-action save-code-button"
-							on:click={saveCode}
-						>
-							{saved ? $i18n.t('Saved') : $i18n.t('Save')}
-						</button>
 					{/if}
 
 					<button
