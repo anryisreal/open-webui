@@ -456,7 +456,7 @@
 						if ($settings?.notificationEnabled ?? false) {
 							new Notification(`${displayTitle} • Open WebUI`, {
 								body: content,
-								icon: `${WEBUI_BASE_URL}/static/logo-mts-icon.svg`
+								icon: `${WEBUI_BASE_URL}/static/favicon.png`
 							});
 						}
 					}
@@ -1034,8 +1034,8 @@
 	<link
 		crossorigin="anonymous"
 		rel="icon"
-		type="image/svg+xml"
-		href="{WEBUI_BASE_URL}/static/logo-mts-icon.svg"
+		type="image/png"
+		href="{WEBUI_BASE_URL}/static/favicon.png"
 	/>
 
 	<meta name="apple-mobile-web-app-title" content={$WEBUI_NAME} />
