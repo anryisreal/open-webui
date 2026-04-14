@@ -2340,6 +2340,29 @@
 		return routingModels.text || selectedModels[0] || AUTO_MODEL_ID;
 	};
 
+	const resolveRequestedTaskType = (_history, parentId: string) => {
+		if (deepResearchEnabled) {
+			return 'deep_research';
+		}
+
+		if (modelSelectionMode !== 'custom') {
+			return undefined;
+		}
+
+		const userMessage = parentId ? _history?.messages?.[parentId] : null;
+		const messageFiles = Array.isArray(userMessage?.files) ? userMessage.files : [];
+
+		if (messageFiles.some((file) => isImageAttachment(file))) {
+			return 'image_analysis';
+		}
+
+		if (messageFiles.some((file) => isAudioAttachment(file))) {
+			return 'audio';
+		}
+
+		return undefined;
+	};
+
 	const sendMessageSocket = async (model, _messages, _history, responseMessageId, _chatId) => {
 		const responseMessage = _history.messages[responseMessageId];
 		const userMessage = _history.messages[responseMessage.parentId];
@@ -2495,6 +2518,7 @@
 
 		// Use the user-selected terminal from the dropdown
 		const activeTerminalId = $selectedTerminalId ?? null;
+		const requestedTaskType = resolveRequestedTaskType(_history, userMessage?.id ?? parentId);
 
 		const res = await generateOpenAIChatCompletion(
 			localStorage.token,
@@ -2522,11 +2546,18 @@
 					...($terminalServers ?? []).filter((t) => !t.id)
 				],
 				features: getFeatures(),
-				metadata: deepResearchEnabled
-					? {
-							task_type: 'deep_research'
-						}
-					: undefined,
+				metadata:
+					requestedTaskType || modelSelectionMode === 'custom'
+						? {
+								...(requestedTaskType ? { task_type: requestedTaskType } : {}),
+								...(modelSelectionMode === 'custom'
+									? {
+											gpthub_model_mode: modelSelectionMode,
+											gpthub_routing_models: routingModels
+										}
+									: {})
+							}
+						: undefined,
 				variables: {
 					...getPromptVariables(
 						$user?.name,
