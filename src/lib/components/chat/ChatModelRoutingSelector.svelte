@@ -2,7 +2,7 @@
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import { models, settings } from '$lib/stores';
+	import { models, settings, type Model } from '$lib/stores';
 	import { updateUserSettings } from '$lib/apis/users';
 
 	import Selector from './ModelSelector/Selector.svelte';
@@ -14,6 +14,12 @@
 		text: string;
 		image: string;
 		audio: string;
+	};
+
+	type SelectorItem = {
+		value: string;
+		label: string;
+		model: Model;
 	};
 
 	const AUTO_MODEL_ID = 'auto';
@@ -32,6 +38,17 @@
 		left.text === right.text && left.image === right.image && left.audio === right.audio;
 
 	const uniqueValues = (values: string[]) => Array.from(new Set(values.filter((value) => value)));
+
+	const isRussianLocale = () => {
+		const language = $i18n?.resolvedLanguage ?? $i18n?.language ?? '';
+		return typeof language === 'string' && language.toLowerCase().startsWith('ru');
+	};
+
+	const textLabel = () => (isRussianLocale() ? 'Текст' : 'Text');
+	const imageLabel = () => (isRussianLocale() ? 'Изображение' : 'Image');
+	const audioLabel = () => (isRussianLocale() ? 'Аудио' : 'Audio');
+	const autoModeLabel = () => (isRussianLocale() ? 'Авто' : 'Auto');
+	const customModeLabel = () => (isRussianLocale() ? 'Пользовательский' : 'Custom');
 
 	const configuredVisionModelIds = () =>
 		uniqueValues([
@@ -52,50 +69,63 @@
 
 	const visibleModels = () => ($models ?? []).filter((model) => !(model?.info?.meta?.hidden ?? false));
 
-	const toItems = (sourceModels) =>
+	const toItems = (sourceModels: Model[]): SelectorItem[] =>
 		sourceModels.map((model) => ({
 			value: model.id,
 			label: model.name,
 			model
 		}));
 
-	const firstMatchingValue = (items, candidates: string[]) => {
+	const firstMatchingValue = (items: SelectorItem[], candidates: string[]) => {
 		const availableValues = new Set(items.map((item) => item.value));
 		return candidates.find((candidate) => candidate && availableValues.has(candidate)) ?? '';
 	};
 
-	const firstValue = (items) => items[0]?.value ?? '';
+	const firstValue = (items: SelectorItem[]) => items[0]?.value ?? '';
 
-	let textItems = [];
-	let imageItems = [];
-	let audioItems = [];
+	const isVisionModel = (model: Model, visionIds: Set<string>) =>
+		visionIds.has(model.id) || Boolean(model?.info?.meta?.capabilities?.vision);
+
+	const isAudioModel = (model: Model, audioIds: Set<string>) =>
+		audioIds.has(model.id) ||
+		Boolean(model?.info?.meta?.capabilities?.audio) ||
+		Boolean(model?.info?.meta?.capabilities?.speech_to_text) ||
+		Boolean(model?.info?.meta?.capabilities?.transcription);
+
+	const isImageGenerationModel = (model: Model) =>
+		Boolean(model?.info?.meta?.capabilities?.image_generation);
+
+	let textItems: SelectorItem[] = [];
+	let imageItems: SelectorItem[] = [];
+	let audioItems: SelectorItem[] = [];
 
 	$: {
 		const availableModels = visibleModels().filter((model) => model.id !== AUTO_MODEL_ID);
-		textItems = toItems(availableModels);
-
 		const visionIds = new Set(configuredVisionModelIds());
-		const filteredImageModels = availableModels.filter((model) =>
-			visionIds.size > 0
-				? visionIds.has(model.id)
-				: (model?.info?.meta?.capabilities?.vision ?? false)
-		);
-		imageItems = toItems(filteredImageModels.length > 0 ? filteredImageModels : availableModels);
-
 		const audioIds = new Set(configuredAudioModelIds());
-		const filteredAudioModels = availableModels.filter((model) =>
-			audioIds.size > 0 ? audioIds.has(model.id) : false
+
+		const filteredTextModels = availableModels.filter(
+			(model) =>
+				!isVisionModel(model, visionIds) &&
+				!isAudioModel(model, audioIds) &&
+				!isImageGenerationModel(model)
 		);
-		audioItems = toItems(filteredAudioModels.length > 0 ? filteredAudioModels : availableModels);
+		textItems = toItems(filteredTextModels.length > 0 ? filteredTextModels : availableModels);
+
+		const filteredImageModels = availableModels.filter((model) => isVisionModel(model, visionIds));
+		imageItems = toItems(filteredImageModels.length > 0 ? filteredImageModels : textItems.map((item) => item.model));
+
+		const filteredAudioModels = availableModels.filter((model) => isAudioModel(model, audioIds));
+		audioItems = toItems(filteredAudioModels.length > 0 ? filteredAudioModels : textItems.map((item) => item.model));
 	}
 
 	const normalizeRoutingModels = (current: ChatRoutingModels): ChatRoutingModels => {
 		const text =
 			firstMatchingValue(textItems, [current.text, selectedModels[0], firstValue(textItems)]) || '';
 		const image =
-			firstMatchingValue(imageItems, [current.image, text, firstValue(imageItems)]) || text || '';
+			firstMatchingValue(imageItems, [current.image, firstValue(imageItems), text]) || text || '';
 		const audio =
-			firstMatchingValue(audioItems, [current.audio, text, firstValue(audioItems)]) || text || '';
+			firstMatchingValue(audioItems, [current.audio, firstValue(audioItems), text]) || text || '';
 		return { text, image, audio };
 	};
 
@@ -153,7 +183,7 @@
 			on:click={() => setMode('auto')}
 			{disabled}
 		>
-			Auto
+			{autoModeLabel()}
 		</button>
 		<button
 			type="button"
@@ -163,21 +193,15 @@
 			on:click={() => setMode('custom')}
 			{disabled}
 		>
-			Custom
+			{customModeLabel()}
 		</button>
 	</div>
 
-	{#if modelSelectionMode === 'auto'}
-		<div
-			class="px-4 py-2 rounded-2xl border border-gray-200 bg-white/70 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900/70 dark:text-gray-200"
-		>
-			Text, image, and audio routing is selected automatically
-		</div>
-	{:else}
+	{#if modelSelectionMode === 'custom'}
 		<div class="flex items-center gap-2 max-w-full overflow-x-auto pb-0.5">
 			<div class="flex items-center gap-1.5 min-w-0">
 				<div class="text-[11px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
-					Text
+					{textLabel()}
 				</div>
 				<div class="min-w-[14rem] max-w-[16rem]">
 					<Selector
@@ -192,7 +216,7 @@
 
 			<div class="flex items-center gap-1.5 min-w-0">
 				<div class="text-[11px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
-					Image
+					{imageLabel()}
 				</div>
 				<div class="min-w-[14rem] max-w-[16rem]">
 					<Selector
@@ -207,7 +231,7 @@
 
 			<div class="flex items-center gap-1.5 min-w-0">
 				<div class="text-[11px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
-					Audio
+					{audioLabel()}
 				</div>
 				<div class="min-w-[14rem] max-w-[16rem]">
 					<Selector
