@@ -166,6 +166,17 @@
 	const parseWorkspaceId = (value: unknown) =>
 		typeof value === 'string' && value.trim() ? value.trim() : '';
 
+	const normalizeWorkspaceId = (value: unknown) => {
+		const normalized = parseWorkspaceId(value);
+		if (!normalized) {
+			return '';
+		}
+		if ($projectsLoaded && !($projects ?? []).some((project) => project.id === normalized)) {
+			return '';
+		}
+		return normalized;
+	};
+
 	const visibleModelIds = () =>
 		($models ?? [])
 			.filter((model) => !(model?.info?.meta?.hidden ?? false))
@@ -390,14 +401,7 @@
 	};
 
 	const currentWorkspaceId = () => {
-		const normalized = parseWorkspaceId(workspaceId);
-		if (!normalized) {
-			return '';
-		}
-		if ($projectsLoaded && !($projects ?? []).some((project) => project.id === normalized)) {
-			return '';
-		}
-		return normalized;
+		return normalizeWorkspaceId(workspaceId);
 	};
 
 	const buildChatPayload = (payload: Record<string, unknown>) => ({
@@ -410,12 +414,32 @@
 		onSelectedModelIdsChange();
 	}
 
-	$: if (!loading && currentWorkspaceId() !== lastPersistedWorkspaceId) {
-		void persistWorkspaceSelection();
-	}
+	const syncPendingWorkspaceSelection = (nextWorkspaceId: string) => {
+		if (!$temporaryChatEnabled && $chatId && !`${$chatId}`.startsWith('local:')) {
+			return;
+		}
 
-	const persistWorkspaceSelection = async () => {
-		const nextWorkspaceId = currentWorkspaceId();
+		const nextUrl = new URL(window.location.href);
+		if (nextWorkspaceId) {
+			nextUrl.searchParams.set('project', nextWorkspaceId);
+		} else {
+			nextUrl.searchParams.delete('project');
+		}
+
+		window.history.replaceState(
+			null,
+			'',
+			`${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`
+		);
+	};
+
+	const applyWorkspaceSelection = async (nextWorkspaceValue: string) => {
+		const nextWorkspaceId = normalizeWorkspaceId(nextWorkspaceValue);
+		const previousWorkspaceId = currentWorkspaceId();
+
+		workspaceId = nextWorkspaceId;
+		syncPendingWorkspaceSelection(nextWorkspaceId);
+
 		if (nextWorkspaceId === lastPersistedWorkspaceId) {
 			return;
 		}
@@ -433,8 +457,12 @@
 			currentChatPage.set(1);
 			await chats.set(await getChatList(localStorage.token, $currentChatPage));
 		} catch (error) {
+			lastPersistedWorkspaceId = previousWorkspaceId;
+			workspaceId = previousWorkspaceId;
+			syncPendingWorkspaceSelection(previousWorkspaceId);
 			console.error(error);
 			toast.error(`${error}`);
+			throw error;
 		}
 	};
 
@@ -3130,6 +3158,7 @@
 						bind:modelSelectionMode
 						bind:routingModels
 						bind:workspaceId
+						onWorkspaceChange={applyWorkspaceSelection}
 						shareEnabled={!!history.currentId}
 						{initNewChat}
 						{archiveChatHandler}

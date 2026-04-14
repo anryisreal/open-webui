@@ -57,6 +57,7 @@
 		audio: ''
 	};
 	export let workspaceId = '';
+	export let onWorkspaceChange: (workspaceId: string) => Promise<void> | void = () => {};
 	export let showModelSelector = true;
 
 	export let onSaveTempChat: () => {};
@@ -130,7 +131,7 @@
 							</div>
 						{/if}
 						<div class="max-w-full shrink-0">
-							<ChatProjectSelector bind:workspaceId />
+							<ChatProjectSelector bind:workspaceId onSelectProject={onWorkspaceChange} />
 						</div>
 					</div>
 				</div>
