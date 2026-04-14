@@ -64,7 +64,11 @@
 		displayFileHandler
 	} from '$lib/utils';
 	import { AudioQueue } from '$lib/utils/audio';
-	import { hasGptHubModality, type GptHubModality } from '$lib/utils/gpthubModels';
+	import {
+		hasAnyGptHubModality,
+		hasGptHubModality,
+		type GptHubModality
+	} from '$lib/utils/gpthubModels';
 
 	import {
 		archiveChatById,
@@ -164,11 +168,15 @@
 
 	const visibleNonAutoModelIds = () => visibleModelIds().filter((modelId) => modelId !== AUTO_MODEL_ID);
 
-	const visibleRoutingModelIds = (modality: GptHubModality) => {
+	const visibleRoutingModelIds = (modality: GptHubModality | GptHubModality[]) => {
 		const routed = ($models ?? [])
 			.filter((model) => !(model?.info?.meta?.hidden ?? false))
 			.filter((model) => model.id !== AUTO_MODEL_ID)
-			.filter((model) => hasGptHubModality(model, modality))
+			.filter((model) =>
+				Array.isArray(modality)
+					? hasAnyGptHubModality(model, modality)
+					: hasGptHubModality(model, modality)
+			)
 			.map((model) => model.id);
 		return routed.length > 0 ? routed : visibleNonAutoModelIds();
 	};
@@ -200,7 +208,7 @@
 		);
 		const image = firstAvailableModelId(
 			[baseRoutingModels.image, text],
-			visibleRoutingModelIds('vision')
+			visibleRoutingModelIds(['vision', 'image_generation'])
 		);
 		const audio = firstAvailableModelId(
 			[baseRoutingModels.audio, text],

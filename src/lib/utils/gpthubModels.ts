@@ -72,3 +72,8 @@ export const getGptHubModalities = (model?: Model | null): GptHubModality[] => {
 
 export const hasGptHubModality = (model: Model | null | undefined, modality: GptHubModality) =>
 	getGptHubModalities(model).includes(modality);
+
+export const hasAnyGptHubModality = (
+	model: Model | null | undefined,
+	modalities: GptHubModality[]
+) => modalities.some((modality) => hasGptHubModality(model, modality));
