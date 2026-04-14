@@ -1551,4 +1551,12 @@
 		-ms-overflow-style: none; /* IE and Edge */
 		scrollbar-width: none; /* Firefox */
 	}
+
+	.buttons > :global(*:not(.copy-response-button):not(:has(.copy-response-button))) {
+		display: none;
+	}
+
+	.buttons :global(button:not(.copy-response-button)) {
+		display: none;
+	}
 </style>

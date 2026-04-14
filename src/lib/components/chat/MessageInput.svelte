@@ -1779,52 +1779,14 @@
 							</div>
 
 							<div class=" flex justify-between mt-0.5 mb-2.5 mx-0.5 max-w-full" dir="ltr">
-								<div class="ml-1 self-end flex items-center flex-1 max-w-[80%]">
+								<div class="ml-1 self-end flex items-center flex-1 max-w-[80%] composer-left-controls">
 									<InputMenu
 										bind:files
 										selectedModels={atSelectedModel ? [atSelectedModel.id] : selectedModels}
 										{fileUploadCapableModels}
-										{screenCaptureHandler}
-										{inputFilesHandler}
 										uploadFilesHandler={() => {
 											filesInputElement.click();
 										}}
-										uploadGoogleDriveHandler={async () => {
-											try {
-												const fileData = await createPicker();
-												if (fileData) {
-													const file = new File([fileData.blob], fileData.name, {
-														type: fileData.blob.type
-													});
-													await uploadFileHandler(file);
-												} else {
-													console.log('No file was selected from Google Drive');
-												}
-											} catch (error) {
-												console.error('Google Drive Error:', error);
-												toast.error(
-													$i18n.t('Error accessing Google Drive: {{error}}', {
-														error: error.message
-													})
-												);
-											}
-										}}
-										uploadOneDriveHandler={async (authorityType) => {
-											try {
-												const fileData = await pickAndDownloadFile(authorityType);
-												if (fileData) {
-													const file = new File([fileData.blob], fileData.name, {
-														type: fileData.blob.type || 'application/octet-stream'
-													});
-													await uploadFileHandler(file);
-												} else {
-													console.log('No file was selected from OneDrive');
-												}
-											} catch (error) {
-												console.error('OneDrive Error:', error);
-											}
-										}}
-										{onUpload}
 										onClose={async () => {
 											await tick();
 
@@ -2263,3 +2225,9 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	.composer-left-controls > :global(*:not(:first-child)) {
+		display: none;
+	}
+</style>
