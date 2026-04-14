@@ -38,9 +38,7 @@
 	});
 
 	$: selectedProject = $projects.find((project) => project.id === workspaceId) ?? null;
-	$: if ($projectsLoaded && workspaceId && !selectedProject) {
-		workspaceId = '';
-	}
+	$: selectValue = selectedProject ? workspaceId : '';
 	$: if ($user?.id && !$projectsLoaded && !loading && !attemptedLoad) {
 		void loadProjects();
 	}
@@ -75,7 +73,10 @@
 
 		<select
 			class="absolute inset-0 opacity-0 cursor-pointer"
-			bind:value={workspaceId}
+			value={selectValue}
+			on:change={(event) => {
+				workspaceId = (event.currentTarget as HTMLSelectElement).value;
+			}}
 			aria-label={$i18n.t('Выберите проект')}
 		>
 			<option value="">{String($i18n.t('Без проекта'))}</option>

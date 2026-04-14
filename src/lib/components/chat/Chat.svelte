@@ -46,7 +46,9 @@
 		selectedTerminalId,
 		showFileNavPath,
 		showFileNavDir,
-		chatRequestQueues
+		chatRequestQueues,
+		projects,
+		projectsLoaded
 	} from '$lib/stores';
 
 	import { WEBUI_API_BASE_URL } from '$lib/constants';
@@ -387,7 +389,16 @@
 		console.log('saveSessionSelectedModels', selectedModels, sessionStorage.selectedModels);
 	};
 
-	const currentWorkspaceId = () => parseWorkspaceId(workspaceId);
+	const currentWorkspaceId = () => {
+		const normalized = parseWorkspaceId(workspaceId);
+		if (!normalized) {
+			return '';
+		}
+		if ($projectsLoaded && !($projects ?? []).some((project) => project.id === normalized)) {
+			return '';
+		}
+		return normalized;
+	};
 
 	const buildChatPayload = (payload: Record<string, unknown>) => ({
 		...payload,
