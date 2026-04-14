@@ -2,7 +2,11 @@
 	import { getContext } from 'svelte';
 
 	import { models, type Model } from '$lib/stores';
-	import { hasGptHubModality, type GptHubModality } from '$lib/utils/gpthubModels';
+	import {
+		hasAnyGptHubModality,
+		hasGptHubModality,
+		type GptHubModality
+	} from '$lib/utils/gpthubModels';
 
 	import Selector from './ModelSelector/Selector.svelte';
 
@@ -68,7 +72,12 @@
 
 	const routingSourceModels = (modality: GptHubModality) => {
 		const availableModels = visibleModels().filter((model) => model.id !== AUTO_MODEL_ID);
-		const filteredModels = availableModels.filter((model) => hasGptHubModality(model, modality));
+		const filteredModels =
+			modality === 'vision'
+				? availableModels.filter((model) =>
+						hasAnyGptHubModality(model, ['vision', 'image_generation'])
+					)
+				: availableModels.filter((model) => hasGptHubModality(model, modality));
 		return filteredModels.length > 0 ? filteredModels : availableModels;
 	};
 
