@@ -21,7 +21,6 @@
 	import ChevronUp from '$lib/components/icons/ChevronUp.svelte';
 	import ChevronUpDown from '$lib/components/icons/ChevronUpDown.svelte';
 	import CommandLine from '$lib/components/icons/CommandLine.svelte';
-	import Cube from '$lib/components/icons/Cube.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 
 	const i18n = getContext('i18n');
@@ -73,6 +72,8 @@
 
 	let copied = false;
 	let saved = false;
+
+	$: languageLabel = ((lang || 'code').trim() || 'code').toLowerCase();
 
 	const collapseCodeBlock = () => {
 		collapsed = !collapsed;
@@ -445,7 +446,7 @@
 
 <div>
 	<div
-		class="relative {className} flex flex-col rounded-2xl border border-gray-100/30 dark:border-gray-850/30 my-0.5"
+		class="gpthub-code-shell relative {className} flex flex-col rounded-3xl my-1"
 		dir="ltr"
 	>
 		{#if ['mermaid', 'vega', 'vega-lite'].includes(lang)}
@@ -469,26 +470,36 @@
 			{/if}
 		{:else}
 			<div
-				class="sticky {stickyButtonsClassName} left-0 right-0 py-1.5 px-3 gap-2 flex items-center justify-end w-full z-10 text-xs text-black dark:text-white bg-white dark:bg-black rounded-t-2xl"
+				class="gpthub-code-toolbar sticky {stickyButtonsClassName} left-0 right-0 px-4 py-3 gap-3 flex items-center justify-between w-full z-10 text-xs rounded-t-3xl"
 			>
-				<div class="flex-1 truncate">
-					<Tooltip content={lang} placement="top-start">
-						<span class=" truncate text-ellipsis">
-							{lang}
-						</span>
+				<div class="min-w-0 flex items-center gap-3">
+					<div class="gpthub-code-window-controls" aria-hidden="true">
+						<span class="gpthub-code-dot gpthub-code-dot-red"></span>
+						<span class="gpthub-code-dot gpthub-code-dot-yellow"></span>
+						<span class="gpthub-code-dot gpthub-code-dot-green"></span>
+					</div>
+
+					<Tooltip content={lang || 'code'} placement="top-start">
+						<div class="gpthub-code-chip min-w-0">
+							<CommandLine className="size-3.5 shrink-0" />
+							<span class="truncate">
+								{languageLabel}
+							</span>
+						</div>
 					</Tooltip>
 				</div>
 
-				<div class="flex items-center gap-0.5 shrink-0">
+				<div class="flex items-center gap-1 shrink-0">
 					<button
-						class="flex gap-1 items-center bg-none border-none transition rounded-md px-1.5 py-0.5 bg-white dark:bg-black"
+						type="button"
+						class="gpthub-code-action flex gap-1.5 items-center"
 						on:click={collapseCodeBlock}
 					>
-						<div class=" -translate-y-[0.5px]">
+						<div class="-translate-y-[0.5px]">
 							<ChevronUpDown className="size-3" />
 						</div>
 
-						<div>
+						<div class="hidden sm:block">
 							{collapsed ? $i18n.t('Expand') : $i18n.t('Collapse')}
 						</div>
 					</button>
@@ -496,21 +507,25 @@
 					{#if ($config?.features?.enable_code_execution ?? true) && (lang.toLowerCase() === 'python' || lang.toLowerCase() === 'py' || (lang === '' && checkPythonCode(code)))}
 						{#if executing}
 							<div
-								class="run-code-button bg-none border-none p-0.5 cursor-not-allowed bg-white dark:bg-black"
+								class="gpthub-code-action run-code-button cursor-not-allowed"
 							>
 								{$i18n.t('Running')}
 							</div>
 						{:else if run}
 							<button
-								class="flex gap-1 items-center run-code-button bg-none border-none transition rounded-md px-1.5 py-0.5 bg-white dark:bg-black"
+								type="button"
+								class="gpthub-code-action flex gap-1.5 items-center run-code-button"
 								on:click={async () => {
 									code = _code;
 									await tick();
 									executePython(code);
 								}}
 							>
-								<div>
+								<div class="hidden sm:block">
 									{$i18n.t('Run')}
+								</div>
+								<div class="sm:hidden">
+									<ChevronUp className="size-3 rotate-90" />
 								</div>
 							</button>
 						{/if}
@@ -518,7 +533,8 @@
 
 					{#if save}
 						<button
-							class="save-code-button bg-none border-none transition rounded-md px-1.5 py-0.5 bg-white dark:bg-black"
+							type="button"
+							class="gpthub-code-action save-code-button"
 							on:click={saveCode}
 						>
 							{saved ? $i18n.t('Saved') : $i18n.t('Save')}
@@ -526,16 +542,18 @@
 					{/if}
 
 					<button
-						class="copy-code-button bg-none border-none transition rounded-md px-1.5 py-0.5 bg-white dark:bg-black"
+						type="button"
+						class="gpthub-code-action copy-code-button"
 						on:click={copyCode}>{copied ? $i18n.t('Copied') : $i18n.t('Copy')}</button
 					>
 
 					{#if preview && ['html', 'svg'].includes(lang)}
 						<button
-							class="flex gap-1 items-center run-code-button bg-none border-none transition rounded-md px-1.5 py-0.5 bg-white dark:bg-black"
+							type="button"
+							class="gpthub-code-action flex gap-1.5 items-center run-code-button"
 							on:click={previewCode}
 						>
-							<div>
+							<div class="hidden sm:block">
 								{$i18n.t('Preview')}
 							</div>
 						</button>
@@ -544,13 +562,13 @@
 			</div>
 
 			<div
-				class="language-{lang} rounded-t-2xl -mt-8 {editorClassName
+				class="gpthub-code-surface language-{lang} rounded-t-3xl -mt-8 {editorClassName
 					? editorClassName
 					: executing || stdout || stderr || result
 						? ''
-						: 'rounded-b-2xl'} overflow-hidden"
+						: 'rounded-b-3xl'} overflow-hidden"
 			>
-				<div class=" pt-6.5 bg-white dark:bg-black"></div>
+				<div class="pt-7"></div>
 
 				{#if !collapsed}
 					{#if edit}
@@ -567,7 +585,7 @@
 						/>
 					{:else}
 						<pre
-							class=" hljs p-4 px-5 overflow-x-auto"
+							class="hljs p-4 px-5 overflow-x-auto"
 							style="border-top-left-radius: 0px; border-top-right-radius: 0px; {(executing ||
 								stdout ||
 								stderr ||
@@ -580,7 +598,7 @@
 					{/if}
 				{:else}
 					<div
-						class="bg-white dark:bg-black dark:text-white rounded-b-2xl! pt-1 pb-2 px-4 flex flex-col gap-2 text-xs"
+						class="gpthub-code-collapsed rounded-b-3xl! pt-1.5 pb-3 px-4 flex flex-col gap-2 text-xs"
 					>
 						<span class="text-gray-500 italic">
 							{$i18n.t('{{COUNT}} hidden lines', {
@@ -594,12 +612,12 @@
 			{#if !collapsed}
 				<div
 					id="plt-canvas-{id}"
-					class="bg-gray-50 dark:bg-black dark:text-white max-w-full overflow-x-auto scrollbar-hidden"
+					class="gpthub-code-output max-w-full overflow-x-auto scrollbar-hidden"
 				/>
 
 				{#if executing || stdout || stderr || result || files}
 					<div
-						class="bg-gray-50 dark:bg-black dark:text-white rounded-b-2xl! py-4 px-4 flex flex-col gap-2"
+						class="gpthub-code-output rounded-b-3xl! py-4 px-4 flex flex-col gap-2"
 					>
 						{#if executing}
 							<div class=" ">

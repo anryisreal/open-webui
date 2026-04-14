@@ -529,11 +529,15 @@
 		{/if}
 	{:else if token.type === 'inlineKatex'}
 		{#if token.text}
-			<KatexRenderer content={token.text} displayMode={token?.displayMode ?? false} />
+			<span class="gpthub-math-inline" dir="ltr">
+				<KatexRenderer content={token.text} displayMode={token?.displayMode ?? false} />
+			</span>
 		{/if}
 	{:else if token.type === 'blockKatex'}
 		{#if token.text}
-			<KatexRenderer content={token.text} displayMode={token?.displayMode ?? false} />
+			<div class="gpthub-math-block" dir="ltr">
+				<KatexRenderer content={token.text} displayMode={token?.displayMode ?? false} />
+			</div>
 		{/if}
 	{:else if token.type === 'colonFence'}
 		<ColonFenceBlock
