@@ -19,7 +19,7 @@
 	let fileUploadEnabled = true;
 
 	$: fileUploadEnabled =
-		fileUploadCapableModels.length === selectedModels.length &&
+		fileUploadCapableModels.length > 0 &&
 		($user?.role === 'admin' || $user?.permissions?.chat?.file_upload);
 
 	$: if (!fileUploadEnabled && files.length > 0) {
@@ -44,7 +44,7 @@
 			class="w-70 rounded-2xl px-1 py-1 border border-gray-100 dark:border-gray-800 z-50 bg-white dark:bg-gray-850 dark:text-white shadow-lg max-h-72 overflow-y-auto overflow-x-hidden scrollbar-thin transition"
 		>
 			<Tooltip
-				content={fileUploadCapableModels.length !== selectedModels.length
+				content={fileUploadCapableModels.length === 0
 					? $i18n.t('Model(s) do not support file upload')
 					: !fileUploadEnabled
 						? $i18n.t('You do not have permission to upload files.')

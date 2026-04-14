@@ -75,7 +75,6 @@
 	import FileItem from '../common/FileItem.svelte';
 	import Image from '../common/Image.svelte';
 	import Spinner from '../common/Spinner.svelte';
-	import ConfirmDialog from '../common/ConfirmDialog.svelte';
 
 	import XMark from '../icons/XMark.svelte';
 	import Photo from '../icons/Photo.svelte';
@@ -114,6 +113,12 @@
 
 	export let atSelectedModel: Model | undefined = undefined;
 	export let selectedModels: [''];
+	export let modelSelectionMode = 'auto';
+	export let routingModels = {
+		text: '',
+		image: '',
+		audio: ''
+	};
 
 	let selectedModelIds = [];
 	$: selectedModelIds = atSelectedModel !== undefined ? [atSelectedModel.id] : selectedModels;
@@ -161,6 +166,17 @@
 		return contentType.startsWith('audio/') || AUDIO_FILE_EXTENSIONS.has(getFileExtension(file));
 	};
 
+	const isImageFile = (file) => {
+		const contentType = (file?.type ?? '').toLowerCase();
+		if (contentType.startsWith('image/')) {
+			return true;
+		}
+
+		return ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'heic', 'heif'].includes(
+			getFileExtension(file)
+		);
+	};
+
 	const getAudioContentType = (file) => {
 		const contentType = (file?.type ?? '').toLowerCase();
 		if (contentType === 'audio/mp3') {
@@ -199,6 +215,77 @@
 		deepResearchEnabled,
 		codeInterpreterEnabled
 	});
+
+	const getConfiguredRoutingModelId = (type: 'text' | 'image' | 'audio') =>
+		typeof routingModels?.[type] === 'string' ? routingModels[type] : '';
+
+	const getTextRouteModelIds = () => {
+		if (atSelectedModel?.id) {
+			return [atSelectedModel.id];
+		}
+		if (modelSelectionMode === 'auto') {
+			return [AUTO_MODEL_ID];
+		}
+		return [getConfiguredRoutingModelId('text') || selectedModels[0] || AUTO_MODEL_ID].filter(Boolean);
+	};
+
+	const getImageRouteModelIds = () => {
+		if (atSelectedModel?.id) {
+			return [atSelectedModel.id];
+		}
+		if (modelSelectionMode === 'auto') {
+			return [AUTO_MODEL_ID];
+		}
+		return [
+			getConfiguredRoutingModelId('image') ||
+				getConfiguredRoutingModelId('text') ||
+				selectedModels[0] ||
+				AUTO_MODEL_ID
+		].filter(Boolean);
+	};
+
+	const getAudioRouteModelIds = () => {
+		if (atSelectedModel?.id) {
+			return [atSelectedModel.id];
+		}
+		if (modelSelectionMode === 'auto') {
+			return [AUTO_MODEL_ID];
+		}
+		return [
+			getConfiguredRoutingModelId('audio') ||
+				getConfiguredRoutingModelId('text') ||
+				selectedModels[0] ||
+				AUTO_MODEL_ID
+		].filter(Boolean);
+	};
+
+	const getComposerRouteModelIds = () =>
+		Array.from(
+			new Set([
+				...getTextRouteModelIds(),
+				...getImageRouteModelIds(),
+				...getAudioRouteModelIds()
+			])
+		);
+
+	const getFileRouteModelIds = (file) => {
+		if (isAudioFile(file)) {
+			return getAudioRouteModelIds();
+		}
+
+		if (isImageFile(file)) {
+			return getImageRouteModelIds();
+		}
+
+		return getTextRouteModelIds();
+	};
+
+	const getFileUploadCapableModelIds = (modelIds: string[]) =>
+		modelIds.filter(
+			(modelId) =>
+				$models.find((model) => model.id === modelId)?.info?.meta?.capabilities?.file_upload ??
+				true
+		);
 
 	const inputVariableHandler = async (text: string): Promise<string> => {
 		inputVariables = extractInputVariables(text);
@@ -473,10 +560,6 @@
 	let inputFiles;
 
 	let showInputModal = false;
-	let showVisionModelSwitchDialog = false;
-	let selectedVisionModelId = '';
-	let pendingVisionFiles = [];
-	let pendingVisionSubmit = false;
 
 	export let dragged = false;
 	let shiftKey = false;
@@ -498,56 +581,51 @@
 				.filter(
 					(modelId) =>
 						typeof modelId === 'string' && /(^|[-_.])vl([-_.]|$)/i.test(modelId)
-				)
+			)
 		])
 	);
 
+	let textFeatureModelIds = [];
+	$: textFeatureModelIds = getTextRouteModelIds();
+
+	let imageRouteModelIds = [];
+	$: imageRouteModelIds = getImageRouteModelIds();
+
+	let composerRouteModelIds = [];
+	$: composerRouteModelIds = getComposerRouteModelIds();
+
 	let visionCapableModels = [];
-	$: visionCapableModels = (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).filter(
-		(modelId) => isAutoModelId(modelId) || configuredVisionModelIds.includes(modelId)
+	$: visionCapableModels = imageRouteModelIds.filter(
+		(modelId) =>
+			isAutoModelId(modelId) ||
+			configuredVisionModelIds.includes(modelId) ||
+			($models.find((model) => model.id === modelId)?.info?.meta?.capabilities?.vision ?? false)
 	);
 
-	let availableVisionModels = [];
-	$: availableVisionModels = configuredVisionModelIds
-		.map((modelId) => {
-			const model = $models.find((item) => item.id === modelId);
-			return (
-				model ?? {
-					id: modelId,
-					name: modelId
-				}
-			);
-		})
-		.filter((model) => typeof model?.id === 'string' && model.id !== 'undefined');
-
 	let fileUploadCapableModels = [];
-	$: fileUploadCapableModels = (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).filter(
+	$: fileUploadCapableModels = composerRouteModelIds.filter(
 		(model) => $models.find((m) => m.id === model)?.info?.meta?.capabilities?.file_upload ?? true
 	);
 
 	let webSearchCapableModels = [];
-	$: webSearchCapableModels = (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).filter(
+	$: webSearchCapableModels = textFeatureModelIds.filter(
 		(model) => $models.find((m) => m.id === model)?.info?.meta?.capabilities?.web_search ?? true
 	);
 
 	let imageGenerationCapableModels = [];
-	$: imageGenerationCapableModels = (
-		atSelectedModel?.id ? [atSelectedModel.id] : selectedModels
-	).filter(
+	$: imageGenerationCapableModels = textFeatureModelIds.filter(
 		(model) =>
 			$models.find((m) => m.id === model)?.info?.meta?.capabilities?.image_generation ?? true
 	);
 
 	let codeInterpreterCapableModels = [];
-	$: codeInterpreterCapableModels = (
-		atSelectedModel?.id ? [atSelectedModel.id] : selectedModels
-	).filter(
+	$: codeInterpreterCapableModels = textFeatureModelIds.filter(
 		(model) =>
 			$models.find((m) => m.id === model)?.info?.meta?.capabilities?.code_interpreter ?? true
 	);
 
 	let toggleFilters = [];
-	$: toggleFilters = (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels)
+	$: toggleFilters = textFeatureModelIds
 		.map((id) => ($models.find((model) => model.id === id) || {})?.filters ?? [])
 		.reduce((acc, filters) => acc.filter((f1) => filters.some((f2) => f2.id === f1.id)));
 
@@ -555,20 +633,20 @@
 	$: showToolsButton = ($tools ?? []).length > 0 || ($toolServers ?? []).length > 0;
 
 	let showDeepResearchButton = false;
-	$: showDeepResearchButton = (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).length > 0;
+	$: showDeepResearchButton = textFeatureModelIds.length > 0;
 
 	let showImageGenerationButton = false;
 	$: showImageGenerationButton =
-		(atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).length ===
-			imageGenerationCapableModels.length &&
+		textFeatureModelIds.length === imageGenerationCapableModels.length &&
+		textFeatureModelIds.length > 0 &&
 		$config?.features?.enable_image_generation &&
 		($_user.role === 'admin' || $_user?.permissions?.features?.image_generation);
 
 	let showCodeInterpreterButton = false;
 	$: showCodeInterpreterButton =
 		!$selectedTerminalId &&
-		(atSelectedModel?.id ? [atSelectedModel.id] : selectedModels).length ===
-			codeInterpreterCapableModels.length &&
+		textFeatureModelIds.length === codeInterpreterCapableModels.length &&
+		textFeatureModelIds.length > 0 &&
 		$config?.features?.enable_code_interpreter &&
 		($_user.role === 'admin' || $_user?.permissions?.features?.code_interpreter);
 
@@ -641,8 +719,6 @@
 		}
 	};
 
-	const getSelectedModelIds = () => (atSelectedModel?.id ? [atSelectedModel.id] : selectedModels);
-
 	const hasImageInput = (items = []) =>
 		items.some(
 			(file) =>
@@ -651,70 +727,16 @@
 				(file?.content_type ?? '').startsWith('image/')
 		);
 
-	const isImageModelSelectionCompatible = () => {
-		const selectedIds = getSelectedModelIds().filter((modelId) => modelId);
-		return (
-			selectedIds.length === 1 &&
-			(isAutoModelId(selectedIds[0]) ||
-				(configuredVisionModelIds.length > 0 && configuredVisionModelIds.includes(selectedIds[0])))
-		);
-	};
-
-	const resetVisionModelSwitchState = () => {
-		pendingVisionFiles = [];
-		pendingVisionSubmit = false;
-		selectedVisionModelId = '';
-	};
-
-	const openVisionModelSwitchDialog = (inputFiles = [], submitAfterSwitch = false) => {
-		if (availableVisionModels.length === 0) {
-			toast.error($i18n.t('No image-capable models are available.'));
-			return;
-		}
-
-		const selectedIds = getSelectedModelIds();
-		selectedVisionModelId =
-			selectedIds.find((modelId) => configuredVisionModelIds.includes(modelId)) ??
-			availableVisionModels[0]?.id ??
-			'';
-		pendingVisionFiles = inputFiles;
-		pendingVisionSubmit = submitAfterSwitch;
-		showVisionModelSwitchDialog = true;
-	};
-
-	const confirmVisionModelSwitch = async () => {
-		if (!selectedVisionModelId) {
-			toast.error($i18n.t('Select an image model before continuing.'));
-			resetVisionModelSwitchState();
-			return;
-		}
-
-		const targetModelId = selectedVisionModelId;
-		const filesToProcess = pendingVisionFiles;
-		const shouldSubmit = pendingVisionSubmit;
-
-		resetVisionModelSwitchState();
-		atSelectedModel = undefined;
-		selectedModels = [targetModelId];
-
-		await tick();
-
-		if (filesToProcess.length > 0) {
-			await inputFilesHandler(filesToProcess, true);
-		}
-
-		if (shouldSubmit) {
-			dispatch('submit', prompt);
-		}
-	};
-
 	const uploadFileHandler = async (file, process = true, itemData = {}) => {
 		if ($_user?.role !== 'admin' && !($_user?.permissions?.chat?.file_upload ?? true)) {
 			toast.error($i18n.t('You do not have permission to upload files.'));
 			return null;
 		}
 
-		if (fileUploadCapableModels.length !== selectedModels.length) {
+		const uploadRouteModelIds = getFileRouteModelIds(file);
+		const uploadCapableModelIds = getFileUploadCapableModelIds(uploadRouteModelIds);
+
+		if (uploadCapableModelIds.length !== uploadRouteModelIds.length) {
 			toast.error($i18n.t('Model(s) do not support file upload'));
 			return null;
 		}
@@ -840,13 +862,8 @@
 		}
 	};
 
-	const inputFilesHandler = async (inputFiles, skipVisionModelCheck = false) => {
+	const inputFilesHandler = async (inputFiles) => {
 		console.log('Input files handler called with:', inputFiles);
-
-		if (!skipVisionModelCheck && hasImageInput(inputFiles) && !isImageModelSelectionCompatible()) {
-			openVisionModelSwitchDialog(inputFiles, false);
-			return;
-		}
 
 		if (
 			($config?.file?.max_count ?? null) !== null &&
@@ -885,11 +902,6 @@
 			}
 
 			if (file['type'].startsWith('image/')) {
-				if (!isImageModelSelectionCompatible()) {
-					toast.error($i18n.t('Selected model(s) do not support image inputs'));
-					return;
-				}
-
 				const compressImageHandler = async (imageUrl, settings = {}, config = {}) => {
 					// Quick shortcut so we don’t do unnecessary work.
 					const settingsCompression = settings?.imageCompression ?? false;
@@ -1253,41 +1265,6 @@
 
 <ToolServersModal bind:show={showTools} {selectedToolIds} />
 
-<ConfirmDialog
-	bind:show={showVisionModelSwitchDialog}
-	title={$i18n.t('Switch to an image model')}
-	message={$i18n.t('To analyze an image, switch to one of the image models below.')}
-	confirmLabel={$i18n.t('Switch model')}
-	cancelLabel={$i18n.t('Cancel')}
-	onConfirm={confirmVisionModelSwitch}
-	on:cancel={() => {
-		resetVisionModelSwitchState();
-	}}
->
-	<div class="text-sm text-gray-500 dark:text-gray-400">
-		{$i18n.t('Choose the model that should process the image.')}
-	</div>
-
-	<div class="mt-4 flex flex-col gap-2">
-		{#each availableVisionModels as model}
-			<button
-				type="button"
-				class={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-					selectedVisionModelId === model.id
-						? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
-						: 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-700'
-				}`}
-				on:click={() => {
-					selectedVisionModelId = model.id;
-				}}
-			>
-				<div class="text-sm font-medium">{model.name ?? model.id}</div>
-				<div class="mt-1 text-xs opacity-70">{model.id}</div>
-			</button>
-		{/each}
-	</div>
-</ConfirmDialog>
-
 <InputVariablesModal
 	bind:show={showInputVariablesModal}
 	variables={inputVariables}
@@ -1410,11 +1387,6 @@
 					<form
 						class="w-full flex flex-col gap-1.5 {recording ? 'hidden' : ''}"
 						on:submit|preventDefault={() => {
-							if (hasImageInput(files) && !isImageModelSelectionCompatible()) {
-								openVisionModelSwitchDialog([], true);
-								return;
-							}
-
 							dispatch('submit', prompt);
 						}}
 					>
@@ -1494,31 +1466,6 @@
 														alt=""
 														imageClassName=" size-10 rounded-xl object-cover"
 													/>
-													{#if atSelectedModel ? visionCapableModels.length === 0 : selectedModels.length !== visionCapableModels.length}
-														<Tooltip
-															className=" absolute top-1 left-1"
-															content={$i18n.t('{{ models }}', {
-																models: [...(atSelectedModel ? [atSelectedModel.id] : selectedModels)]
-																	.filter((id) => !visionCapableModels.includes(id))
-																	.map((id) => $models.find((model) => model.id === id)?.name ?? id)
-																	.join(', ')
-															})}
-														>
-															<svg
-																xmlns="http://www.w3.org/2000/svg"
-																viewBox="0 0 24 24"
-																fill="currentColor"
-																aria-hidden="true"
-																class="size-4 fill-yellow-300"
-															>
-																<path
-																	fill-rule="evenodd"
-																	d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"
-																	clip-rule="evenodd"
-																/>
-															</svg>
-														</Tooltip>
-													{/if}
 												</div>
 												<div class=" absolute -top-1 -right-1">
 													<button
@@ -1773,7 +1720,7 @@
 								<div class="ml-1 self-end flex items-center flex-1 max-w-[80%] composer-left-controls">
 									<InputMenu
 										bind:files
-										selectedModels={atSelectedModel ? [atSelectedModel.id] : selectedModels}
+										selectedModels={composerRouteModelIds}
 										{fileUploadCapableModels}
 										uploadFilesHandler={() => {
 											filesInputElement.click();

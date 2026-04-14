@@ -38,6 +38,12 @@
 
 	export let atSelectedModel: Model | undefined;
 	export let selectedModels: [''];
+	export let modelSelectionMode = 'auto';
+	export let routingModels = {
+		text: '',
+		image: '',
+		audio: ''
+	};
 
 	export let history;
 
@@ -205,13 +211,15 @@
 			{/if}
 
 			<div class="text-base font-normal @md:max-w-3xl w-full py-3 {atSelectedModel ? 'mt-2' : ''}">
-				<MessageInput
-					bind:this={messageInput}
-					{history}
-					bind:selectedModels
-					bind:files
-					bind:prompt
-					bind:autoScroll
+					<MessageInput
+						bind:this={messageInput}
+						{history}
+						bind:selectedModels
+						bind:modelSelectionMode
+						bind:routingModels
+						bind:files
+						bind:prompt
+						bind:autoScroll
 					bind:selectedToolIds
 					bind:selectedFilterIds
 					bind:imageGenerationEnabled

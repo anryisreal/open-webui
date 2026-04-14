@@ -21,7 +21,7 @@
 	import { goto } from '$app/navigation';
 
 	import ShareChatModal from '../chat/ShareChatModal.svelte';
-	import ModelSelector from '../chat/ModelSelector.svelte';
+	import ChatModelRoutingSelector from '../chat/ChatModelRoutingSelector.svelte';
 	import Tooltip from '../common/Tooltip.svelte';
 	import Menu from '$lib/components/layout/Navbar/Menu.svelte';
 	import UserMenu from '$lib/components/layout/Sidebar/UserMenu.svelte';
@@ -49,6 +49,12 @@
 	export let chat;
 	export let history;
 	export let selectedModels;
+	export let modelSelectionMode = 'auto';
+	export let routingModels = {
+		text: '',
+		image: '',
+		audio: ''
+	};
 	export let showModelSelector = true;
 
 	export let onSaveTempChat: () => {};
@@ -112,7 +118,12 @@
 			"
 				>
 					{#if showModelSelector}
-						<ModelSelector bind:selectedModels showSetDefault={!shareEnabled} />
+						<ChatModelRoutingSelector
+							bind:selectedModels
+							bind:modelSelectionMode
+							bind:routingModels
+							showSetDefault={!shareEnabled}
+						/>
 					{/if}
 				</div>
 

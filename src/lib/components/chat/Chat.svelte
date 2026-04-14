@@ -124,6 +124,116 @@
 
 	let navbarElement;
 
+	type ChatModelSelectionMode = 'auto' | 'custom';
+	type ChatRoutingModels = {
+		text: string;
+		image: string;
+		audio: string;
+	};
+
+	const AUTO_MODEL_ID = 'auto';
+	const createEmptyRoutingModels = (): ChatRoutingModels => ({
+		text: '',
+		image: '',
+		audio: ''
+	});
+
+	const parseModelSelectionMode = (value: unknown): ChatModelSelectionMode =>
+		value === 'custom' ? 'custom' : 'auto';
+
+	const parseRoutingModels = (value: unknown): ChatRoutingModels => {
+		if (!value || typeof value !== 'object') {
+			return createEmptyRoutingModels();
+		}
+
+		return {
+			text: typeof value.text === 'string' ? value.text : '',
+			image: typeof value.image === 'string' ? value.image : '',
+			audio: typeof value.audio === 'string' ? value.audio : ''
+		};
+	};
+
+	const sameRoutingModels = (left: ChatRoutingModels, right: ChatRoutingModels) =>
+		left.text === right.text && left.image === right.image && left.audio === right.audio;
+
+	const visibleModelIds = () =>
+		($models ?? [])
+			.filter((model) => !(model?.info?.meta?.hidden ?? false))
+			.map((model) => model.id);
+
+	const visibleNonAutoModelIds = () => visibleModelIds().filter((modelId) => modelId !== AUTO_MODEL_ID);
+
+	const configuredVisionModelIds = () =>
+		Array.from(
+			new Set(
+				[
+					...(import.meta.env.VITE_GPTHUB_VISION_MODELS ?? '')
+						.split(',')
+						.map((modelId) => modelId.trim())
+						.filter((modelId) => modelId),
+					...($models ?? [])
+						.map((model) => model?.id)
+						.filter(
+							(modelId) =>
+								typeof modelId === 'string' && /(^|[-_.])vl([-_.]|$)/i.test(modelId)
+						)
+				].filter((modelId) => visibleModelIds().includes(modelId))
+			)
+		);
+
+	const configuredAudioModelIds = () =>
+		Array.from(
+			new Set(
+				(import.meta.env.VITE_GPTHUB_AUDIO_MODELS ?? '')
+					.split(',')
+					.map((modelId) => modelId.trim())
+					.filter((modelId) => modelId && visibleModelIds().includes(modelId))
+			)
+		);
+
+	const firstAvailableModelId = (preferredIds: string[] = []) => {
+		const available = visibleNonAutoModelIds();
+		for (const modelId of preferredIds) {
+			if (modelId && available.includes(modelId)) {
+				return modelId;
+			}
+		}
+		return available[0] ?? '';
+	};
+
+	const normalizeRoutingState = ({
+		selectedModels: selectedModelsCandidate,
+		modelSelectionMode: modelSelectionModeCandidate,
+		routingModels: routingModelsCandidate
+	}: {
+		selectedModels: string[];
+		modelSelectionMode: unknown;
+		routingModels: unknown;
+	}) => {
+		const baseRoutingModels = parseRoutingModels(routingModelsCandidate);
+		const selectedModelId =
+			selectedModelsCandidate.find((modelId) => modelId && modelId !== AUTO_MODEL_ID) ?? '';
+		const text = firstAvailableModelId([baseRoutingModels.text, selectedModelId]);
+		const image = firstAvailableModelId([baseRoutingModels.image, ...configuredVisionModelIds(), text]);
+		const audio = firstAvailableModelId([baseRoutingModels.audio, ...configuredAudioModelIds(), text]);
+		const nextMode =
+			modelSelectionModeCandidate !== undefined
+				? parseModelSelectionMode(modelSelectionModeCandidate)
+				: selectedModelsCandidate[0] === AUTO_MODEL_ID
+					? 'auto'
+					: 'custom';
+
+		return {
+			modelSelectionMode: nextMode,
+			routingModels: {
+				text,
+				image,
+				audio
+			},
+			selectedModels: nextMode === 'auto' ? [AUTO_MODEL_ID] : [text || '']
+		};
+	};
+
 	let showEventConfirmation = false;
 	let eventConfirmationTitle = '';
 	let eventConfirmationMessage = '';
@@ -134,6 +244,8 @@
 	let eventCallback = null;
 
 	let selectedModels = [''];
+	let modelSelectionMode: ChatModelSelectionMode = 'auto';
+	let routingModels: ChatRoutingModels = createEmptyRoutingModels();
 	let atSelectedModel: Model | undefined;
 	let selectedModelIds = [];
 	$: if (atSelectedModel !== undefined) {
@@ -255,14 +367,20 @@
 
 	const saveSessionSelectedModels = () => {
 		const selectedModelsString = JSON.stringify(selectedModels);
+		const routingState = JSON.stringify({
+			modelSelectionMode,
+			routingModels
+		});
 		if (
 			selectedModels.length === 0 ||
 			(selectedModels.length === 1 && selectedModels[0] === '') ||
-			sessionStorage.selectedModels === selectedModelsString
+			(sessionStorage.selectedModels === selectedModelsString &&
+				sessionStorage.gpthubModelRoutingState === routingState)
 		) {
 			return;
 		}
 		sessionStorage.selectedModels = selectedModelsString;
+		sessionStorage.gpthubModelRoutingState = routingState;
 		console.log('saveSessionSelectedModels', selectedModels, sessionStorage.selectedModels);
 	};
 
@@ -1052,6 +1170,9 @@
 			.map((m) => m.id);
 
 		const defaultModels = $config?.default_models ? $config?.default_models.split(',') : [];
+		const savedRoutingState = sessionStorage.gpthubModelRoutingState
+			? JSON.parse(sessionStorage.gpthubModelRoutingState)
+			: null;
 
 		if ($page.url.searchParams.get('models') || $page.url.searchParams.get('model')) {
 			const urlModels = (
@@ -1088,22 +1209,94 @@
 			selectedModels = selectedModels.filter((modelId) =>
 				$models.map((m) => m.id).includes(modelId)
 			);
+			const normalizedUrlState = normalizeRoutingState({
+				selectedModels,
+				modelSelectionMode:
+					selectedModels[0] === AUTO_MODEL_ID ? 'auto' : 'custom',
+				routingModels: {
+					text:
+						selectedModels[0] && selectedModels[0] !== AUTO_MODEL_ID ? selectedModels[0] : '',
+					image: '',
+					audio: ''
+				}
+			});
+			selectedModels = normalizedUrlState.selectedModels;
+			modelSelectionMode = normalizedUrlState.modelSelectionMode;
+			routingModels = normalizedUrlState.routingModels;
 		} else {
 			if ($selectedFolder?.data?.model_ids) {
 				// Set from folder model IDs
 				selectedModels = $selectedFolder?.data?.model_ids;
+				const normalizedFolderState = normalizeRoutingState({
+					selectedModels,
+					modelSelectionMode: $selectedFolder?.data?.gpthubModelMode,
+					routingModels: $selectedFolder?.data?.gpthubRoutingModels
+				});
+				selectedModels = normalizedFolderState.selectedModels;
+				modelSelectionMode = normalizedFolderState.modelSelectionMode;
+				routingModels = normalizedFolderState.routingModels;
 			} else {
 				if (sessionStorage.selectedModels) {
 					// Set from session storage (temporary selection)
 					selectedModels = JSON.parse(sessionStorage.selectedModels);
 					sessionStorage.removeItem('selectedModels');
+					sessionStorage.removeItem('gpthubModelRoutingState');
+					const normalizedSessionState = normalizeRoutingState({
+						selectedModels,
+						modelSelectionMode: savedRoutingState?.modelSelectionMode,
+						routingModels: savedRoutingState?.routingModels
+					});
+					selectedModels = normalizedSessionState.selectedModels;
+					modelSelectionMode = normalizedSessionState.modelSelectionMode;
+					routingModels = normalizedSessionState.routingModels;
 				} else {
-					if ($settings?.models) {
+					if (($settings as any)?.gpthubModelMode || ($settings as any)?.gpthubRoutingModels) {
+						const normalizedSettingsState = normalizeRoutingState({
+							selectedModels: Array.isArray($settings?.models) ? $settings.models : defaultModels,
+							modelSelectionMode: ($settings as any)?.gpthubModelMode,
+							routingModels: ($settings as any)?.gpthubRoutingModels
+						});
+						selectedModels = normalizedSettingsState.selectedModels;
+						modelSelectionMode = normalizedSettingsState.modelSelectionMode;
+						routingModels = normalizedSettingsState.routingModels;
+					} else if ($settings?.models) {
 						// Set from user settings
 						selectedModels = $settings?.models;
+						const normalizedSettingsState = normalizeRoutingState({
+							selectedModels,
+							modelSelectionMode:
+								selectedModels[0] === AUTO_MODEL_ID ? 'auto' : 'custom',
+							routingModels: {
+								text:
+									selectedModels[0] && selectedModels[0] !== AUTO_MODEL_ID
+										? selectedModels[0]
+										: '',
+								image: '',
+								audio: ''
+							}
+						});
+						selectedModels = normalizedSettingsState.selectedModels;
+						modelSelectionMode = normalizedSettingsState.modelSelectionMode;
+						routingModels = normalizedSettingsState.routingModels;
 					} else if (defaultModels && defaultModels.length > 0) {
 						// Set from default models
 						selectedModels = defaultModels;
+						const normalizedDefaultState = normalizeRoutingState({
+							selectedModels,
+							modelSelectionMode:
+								selectedModels[0] === AUTO_MODEL_ID ? 'auto' : 'custom',
+							routingModels: {
+								text:
+									selectedModels[0] && selectedModels[0] !== AUTO_MODEL_ID
+										? selectedModels[0]
+										: '',
+								image: '',
+								audio: ''
+							}
+						});
+						selectedModels = normalizedDefaultState.selectedModels;
+						modelSelectionMode = normalizedDefaultState.modelSelectionMode;
+						routingModels = normalizedDefaultState.routingModels;
 					}
 				}
 			}
@@ -1130,6 +1323,15 @@
 				selectedModels = [''];
 			}
 		}
+
+		const normalizedFinalState = normalizeRoutingState({
+			selectedModels,
+			modelSelectionMode,
+			routingModels
+		});
+		selectedModels = normalizedFinalState.selectedModels;
+		modelSelectionMode = normalizedFinalState.modelSelectionMode;
+		routingModels = normalizedFinalState.routingModels;
 
 		if ($mobile) {
 			await showControls.set(false);
@@ -1260,6 +1462,15 @@
 						? chatContent.models
 						: [chatContent.models ?? ''];
 
+				const normalizedChatState = normalizeRoutingState({
+					selectedModels,
+					modelSelectionMode: chatContent?.gpthubModelMode,
+					routingModels: chatContent?.gpthubRoutingModels
+				});
+				selectedModels = normalizedChatState.selectedModels;
+				modelSelectionMode = normalizedChatState.modelSelectionMode;
+				routingModels = normalizedChatState.routingModels;
+
 				if (!($user?.role === 'admin' || ($user?.permissions?.chat?.multiple_models ?? true))) {
 					selectedModels = selectedModels.length > 0 ? [selectedModels[0]] : [''];
 				}
@@ -1388,6 +1599,8 @@
 			if (!$temporaryChatEnabled) {
 				chat = await updateChatById(localStorage.token, _chatId, {
 					models: selectedModels,
+					gpthubModelMode: modelSelectionMode,
+					gpthubRoutingModels: routingModels,
 					messages: messages,
 					history: history,
 					params: params,
@@ -1443,6 +1656,8 @@
 			if (!$temporaryChatEnabled) {
 				chat = await updateChatById(localStorage.token, _chatId, {
 					models: selectedModels,
+					gpthubModelMode: modelSelectionMode,
+					gpthubRoutingModels: routingModels,
 					messages: messages,
 					history: history,
 					params: params,
@@ -1924,12 +2139,7 @@
 		_history = structuredClone(_history);
 
 		const responseMessageIds: Record<PropertyKey, string> = {};
-		// If modelId is provided, use it, else use selected model
-		let selectedModelIds = modelId
-			? [modelId]
-			: atSelectedModel !== undefined
-				? [atSelectedModel.id]
-				: selectedModels;
+		let selectedModelIds = [resolveRequestedModelId(_history, parentId, modelId)];
 
 		// Create response messages for each selected model
 		for (const [_modelIdx, modelId] of selectedModelIds.entries()) {
@@ -2056,6 +2266,28 @@
 			.map((token) => decodeURIComponent(JSON.parse(`"${token.replace(/"/g, '\\"')}"`)));
 	};
 
+	const isImageAttachment = (file) => {
+		if (!file || typeof file !== 'object') {
+			return false;
+		}
+
+		const contentType = (
+			file.content_type ??
+			file.mime_type ??
+			file.file?.content_type ??
+			file.file?.meta?.content_type ??
+			''
+		)
+			.toString()
+			.toLowerCase();
+
+		if (contentType.startsWith('image/')) {
+			return true;
+		}
+
+		return file.type === 'image';
+	};
+
 	const isAudioAttachment = (file) => {
 		if (!file || typeof file !== 'object') {
 			return false;
@@ -2080,6 +2312,33 @@
 	};
 
 	const isPersistentChatFile = (file) => !isAudioAttachment(file);
+
+	const resolveRequestedModelId = (_history, parentId: string, explicitModelId: string | null = null) => {
+		if (explicitModelId) {
+			return explicitModelId;
+		}
+
+		if (atSelectedModel?.id) {
+			return atSelectedModel.id;
+		}
+
+		if (modelSelectionMode === 'auto') {
+			return AUTO_MODEL_ID;
+		}
+
+		const userMessage = parentId ? _history?.messages?.[parentId] : null;
+		const messageFiles = Array.isArray(userMessage?.files) ? userMessage.files : [];
+
+		if (messageFiles.some((file) => isImageAttachment(file))) {
+			return routingModels.image || routingModels.text || AUTO_MODEL_ID;
+		}
+
+		if (messageFiles.some((file) => isAudioAttachment(file))) {
+			return routingModels.audio || routingModels.text || AUTO_MODEL_ID;
+		}
+
+		return routingModels.text || selectedModels[0] || AUTO_MODEL_ID;
+	};
 
 	const sendMessageSocket = async (model, _messages, _history, responseMessageId, _chatId) => {
 		const responseMessage = _history.messages[responseMessageId];
@@ -2589,6 +2848,8 @@
 					id: _chatId,
 					title: $i18n.t('New Chat'),
 					models: selectedModels,
+					gpthubModelMode: modelSelectionMode,
+					gpthubRoutingModels: routingModels,
 					system: $settings.system ?? undefined,
 					params: params,
 					history: history,
@@ -2624,6 +2885,8 @@
 			if (!$temporaryChatEnabled) {
 				chat = await updateChatById(localStorage.token, _chatId, {
 					models: selectedModels,
+					gpthubModelMode: modelSelectionMode,
+					gpthubRoutingModels: routingModels,
 					history: history,
 					messages: createMessagesList(history, history.currentId),
 					params: params,
@@ -2766,6 +3029,8 @@
 							chat: {
 								title: $chatTitle,
 								models: selectedModels,
+								gpthubModelMode: modelSelectionMode,
+								gpthubRoutingModels: routingModels,
 								system: $settings.system ?? undefined,
 								params: params,
 								history: history,
@@ -2775,6 +3040,8 @@
 						{history}
 						title={$chatTitle}
 						bind:selectedModels
+						bind:modelSelectionMode
+						bind:routingModels
 						shareEnabled={!!history.currentId}
 						{initNewChat}
 						{archiveChatHandler}
@@ -2795,6 +3062,8 @@
 										id: uuidv4(),
 										title: title.length > 50 ? `${title.slice(0, 50)}...` : title,
 										models: selectedModels,
+										gpthubModelMode: modelSelectionMode,
+										gpthubRoutingModels: routingModels,
 										params: params,
 										history: history,
 										messages: messages,
@@ -2868,6 +3137,8 @@
 									bind:files
 									bind:prompt
 									bind:autoScroll
+									bind:modelSelectionMode
+									bind:routingModels
 									bind:selectedToolIds
 									bind:selectedFilterIds
 									bind:imageGenerationEnabled
@@ -2953,6 +3224,8 @@
 									bind:files
 									bind:prompt
 									bind:autoScroll
+									bind:modelSelectionMode
+									bind:routingModels
 									bind:selectedToolIds
 									bind:selectedFilterIds
 									bind:imageGenerationEnabled
