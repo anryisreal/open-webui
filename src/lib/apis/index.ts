@@ -1779,7 +1779,9 @@ export interface ModelConfig {
 export interface ModelMeta {
 	toolIds: never[];
 	description?: string;
-	capabilities?: object;
+	capabilities?: Record<string, unknown>;
+	gpthub_modalities?: string[];
+	gpthub_primary_modality?: string;
 	profile_image_url?: string;
 }
 

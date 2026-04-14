@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
-	import { toast } from 'svelte-sonner';
 
-	import { models, settings, type Model } from '$lib/stores';
-	import { updateUserSettings } from '$lib/apis/users';
+	import { models, type Model } from '$lib/stores';
+	import { hasGptHubModality, type GptHubModality } from '$lib/utils/gpthubModels';
 
 	import Selector from './ModelSelector/Selector.svelte';
 
@@ -32,40 +31,24 @@
 		audio: ''
 	};
 	export let disabled = false;
-	export let showSetDefault = true;
 
 	const sameRoutingModels = (left: ChatRoutingModels, right: ChatRoutingModels) =>
 		left.text === right.text && left.image === right.image && left.audio === right.audio;
-
-	const uniqueValues = (values: string[]) => Array.from(new Set(values.filter((value) => value)));
 
 	const isRussianLocale = () => {
 		const language = $i18n?.resolvedLanguage ?? $i18n?.language ?? '';
 		return typeof language === 'string' && language.toLowerCase().startsWith('ru');
 	};
 
-	const textLabel = () => (isRussianLocale() ? 'Текст' : 'Text');
-	const imageLabel = () => (isRussianLocale() ? 'Изображение' : 'Image');
-	const audioLabel = () => (isRussianLocale() ? 'Аудио' : 'Audio');
-	const autoModeLabel = () => (isRussianLocale() ? 'Авто' : 'Auto');
-	const customModeLabel = () => (isRussianLocale() ? 'Пользовательский' : 'Custom');
-
-	const configuredVisionModelIds = () =>
-		uniqueValues([
-			...(import.meta.env.VITE_GPTHUB_VISION_MODELS ?? '')
-				.split(',')
-				.map((modelId) => modelId.trim()),
-			...($models ?? [])
-				.map((model) => model?.id ?? '')
-				.filter((modelId) => /(^|[-_.])vl([-_.]|$)/i.test(modelId))
-		]);
-
-	const configuredAudioModelIds = () =>
-		uniqueValues(
-			(import.meta.env.VITE_GPTHUB_AUDIO_MODELS ?? '')
-				.split(',')
-				.map((modelId) => modelId.trim())
-		);
+	const textLabel = () => (isRussianLocale() ? '\u0422\u0435\u043a\u0441\u0442' : 'Text');
+	const imageLabel = () =>
+		(isRussianLocale() ? '\u0418\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435' : 'Image');
+	const audioLabel = () => (isRussianLocale() ? '\u0410\u0443\u0434\u0438\u043e' : 'Audio');
+	const autoModeLabel = () => (isRussianLocale() ? '\u0410\u0432\u0442\u043e' : 'Auto');
+	const customModeLabel = () =>
+		(isRussianLocale()
+			? '\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u0441\u043a\u0438\u0439'
+			: 'Custom');
 
 	const visibleModels = () => ($models ?? []).filter((model) => !(model?.info?.meta?.hidden ?? false));
 
@@ -83,40 +66,20 @@
 
 	const firstValue = (items: SelectorItem[]) => items[0]?.value ?? '';
 
-	const isVisionModel = (model: Model, visionIds: Set<string>) =>
-		visionIds.has(model.id) || Boolean(model?.info?.meta?.capabilities?.vision);
-
-	const isAudioModel = (model: Model, audioIds: Set<string>) =>
-		audioIds.has(model.id) ||
-		Boolean(model?.info?.meta?.capabilities?.audio) ||
-		Boolean(model?.info?.meta?.capabilities?.speech_to_text) ||
-		Boolean(model?.info?.meta?.capabilities?.transcription);
-
-	const isImageGenerationModel = (model: Model) =>
-		Boolean(model?.info?.meta?.capabilities?.image_generation);
+	const routingSourceModels = (modality: GptHubModality) => {
+		const availableModels = visibleModels().filter((model) => model.id !== AUTO_MODEL_ID);
+		const filteredModels = availableModels.filter((model) => hasGptHubModality(model, modality));
+		return filteredModels.length > 0 ? filteredModels : availableModels;
+	};
 
 	let textItems: SelectorItem[] = [];
 	let imageItems: SelectorItem[] = [];
 	let audioItems: SelectorItem[] = [];
 
 	$: {
-		const availableModels = visibleModels().filter((model) => model.id !== AUTO_MODEL_ID);
-		const visionIds = new Set(configuredVisionModelIds());
-		const audioIds = new Set(configuredAudioModelIds());
-
-		const filteredTextModels = availableModels.filter(
-			(model) =>
-				!isVisionModel(model, visionIds) &&
-				!isAudioModel(model, audioIds) &&
-				!isImageGenerationModel(model)
-		);
-		textItems = toItems(filteredTextModels.length > 0 ? filteredTextModels : availableModels);
-
-		const filteredImageModels = availableModels.filter((model) => isVisionModel(model, visionIds));
-		imageItems = toItems(filteredImageModels.length > 0 ? filteredImageModels : textItems.map((item) => item.model));
-
-		const filteredAudioModels = availableModels.filter((model) => isAudioModel(model, audioIds));
-		audioItems = toItems(filteredAudioModels.length > 0 ? filteredAudioModels : textItems.map((item) => item.model));
+		textItems = toItems(routingSourceModels('text'));
+		imageItems = toItems(routingSourceModels('vision'));
+		audioItems = toItems(routingSourceModels('audio'));
 	}
 
 	const normalizeRoutingModels = (current: ChatRoutingModels): ChatRoutingModels => {
@@ -152,24 +115,6 @@
 		if (mode === 'custom') {
 			routingModels = normalizeRoutingModels(routingModels);
 		}
-	};
-
-	const saveDefaultModel = async () => {
-		if (modelSelectionMode === 'custom' && !routingModels.text) {
-			toast.error($i18n.t('Choose a model before saving...'));
-			return;
-		}
-
-		const nextSettings = {
-			...$settings,
-			models: selectedModels,
-			gpthubModelMode: modelSelectionMode,
-			gpthubRoutingModels: routingModels
-		};
-		settings.set(nextSettings);
-		await updateUserSettings(localStorage.token, { ui: nextSettings });
-
-		toast.success($i18n.t('Default model updated'));
 	};
 </script>
 
@@ -246,11 +191,3 @@
 		</div>
 	{/if}
 </div>
-
-{#if showSetDefault}
-	<div
-		class="relative text-left mt-[1px] ml-1 text-[0.7rem] text-gray-600 dark:text-gray-400 font-primary"
-	>
-		<button on:click={saveDefaultModel}> {$i18n.t('Set as default')}</button>
-	</div>
-{/if}

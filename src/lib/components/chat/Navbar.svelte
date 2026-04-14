@@ -122,7 +122,6 @@
 							bind:selectedModels
 							bind:modelSelectionMode
 							bind:routingModels
-							showSetDefault={!shareEnabled}
 						/>
 					{/if}
 				</div>

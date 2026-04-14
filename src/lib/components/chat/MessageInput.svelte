@@ -52,6 +52,7 @@
 		getUserTimezone,
 		getWeekday
 	} from '$lib/utils';
+	import { hasGptHubModality } from '$lib/utils/gpthubModels';
 	import { uploadFile } from '$lib/apis/files';
 	import { generateAutoCompletion } from '$lib/apis';
 	import { deleteFileById } from '$lib/apis/files';
@@ -569,22 +570,6 @@
 	const AUTO_MODEL_ID = 'auto';
 	const isAutoModelId = (modelId) => modelId === AUTO_MODEL_ID;
 
-	let configuredVisionModelIds = [];
-	$: configuredVisionModelIds = Array.from(
-		new Set([
-			...(import.meta.env.VITE_GPTHUB_VISION_MODELS ?? '')
-				.split(',')
-				.map((modelId) => modelId.trim())
-				.filter((modelId) => modelId),
-			...($models ?? [])
-				.map((model) => model?.id)
-				.filter(
-					(modelId) =>
-						typeof modelId === 'string' && /(^|[-_.])vl([-_.]|$)/i.test(modelId)
-			)
-		])
-	);
-
 	let textFeatureModelIds = [];
 	$: textFeatureModelIds = getTextRouteModelIds();
 
@@ -598,8 +583,7 @@
 	$: visionCapableModels = imageRouteModelIds.filter(
 		(modelId) =>
 			isAutoModelId(modelId) ||
-			configuredVisionModelIds.includes(modelId) ||
-			($models.find((model) => model.id === modelId)?.info?.meta?.capabilities?.vision ?? false)
+			hasGptHubModality($models.find((model) => model.id === modelId), 'vision')
 	);
 
 	let fileUploadCapableModels = [];

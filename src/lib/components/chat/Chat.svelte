@@ -64,6 +64,7 @@
 		displayFileHandler
 	} from '$lib/utils';
 	import { AudioQueue } from '$lib/utils/audio';
+	import { hasGptHubModality, type GptHubModality } from '$lib/utils/gpthubModels';
 
 	import {
 		archiveChatById,
@@ -163,36 +164,16 @@
 
 	const visibleNonAutoModelIds = () => visibleModelIds().filter((modelId) => modelId !== AUTO_MODEL_ID);
 
-	const configuredVisionModelIds = () =>
-		Array.from(
-			new Set(
-				[
-					...(import.meta.env.VITE_GPTHUB_VISION_MODELS ?? '')
-						.split(',')
-						.map((modelId) => modelId.trim())
-						.filter((modelId) => modelId),
-					...($models ?? [])
-						.map((model) => model?.id)
-						.filter(
-							(modelId) =>
-								typeof modelId === 'string' && /(^|[-_.])vl([-_.]|$)/i.test(modelId)
-						)
-				].filter((modelId) => visibleModelIds().includes(modelId))
-			)
-		);
+	const visibleRoutingModelIds = (modality: GptHubModality) => {
+		const routed = ($models ?? [])
+			.filter((model) => !(model?.info?.meta?.hidden ?? false))
+			.filter((model) => model.id !== AUTO_MODEL_ID)
+			.filter((model) => hasGptHubModality(model, modality))
+			.map((model) => model.id);
+		return routed.length > 0 ? routed : visibleNonAutoModelIds();
+	};
 
-	const configuredAudioModelIds = () =>
-		Array.from(
-			new Set(
-				(import.meta.env.VITE_GPTHUB_AUDIO_MODELS ?? '')
-					.split(',')
-					.map((modelId) => modelId.trim())
-					.filter((modelId) => modelId && visibleModelIds().includes(modelId))
-			)
-		);
-
-	const firstAvailableModelId = (preferredIds: string[] = []) => {
-		const available = visibleNonAutoModelIds();
+	const firstAvailableModelId = (preferredIds: string[] = [], available = visibleNonAutoModelIds()) => {
 		for (const modelId of preferredIds) {
 			if (modelId && available.includes(modelId)) {
 				return modelId;
@@ -213,9 +194,18 @@
 		const baseRoutingModels = parseRoutingModels(routingModelsCandidate);
 		const selectedModelId =
 			selectedModelsCandidate.find((modelId) => modelId && modelId !== AUTO_MODEL_ID) ?? '';
-		const text = firstAvailableModelId([baseRoutingModels.text, selectedModelId]);
-		const image = firstAvailableModelId([baseRoutingModels.image, ...configuredVisionModelIds(), text]);
-		const audio = firstAvailableModelId([baseRoutingModels.audio, ...configuredAudioModelIds(), text]);
+		const text = firstAvailableModelId(
+			[baseRoutingModels.text, selectedModelId],
+			visibleRoutingModelIds('text')
+		);
+		const image = firstAvailableModelId(
+			[baseRoutingModels.image, text],
+			visibleRoutingModelIds('vision')
+		);
+		const audio = firstAvailableModelId(
+			[baseRoutingModels.audio, text],
+			visibleRoutingModelIds('audio')
+		);
 		const nextMode =
 			modelSelectionModeCandidate !== undefined
 				? parseModelSelectionMode(modelSelectionModeCandidate)
