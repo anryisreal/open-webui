@@ -40,180 +40,48 @@
 			id: 'general',
 			title: 'General',
 			keywords: [
-				'advancedparams',
-				'advancedparameters',
-				'advanced params',
-				'advanced parameters',
-				'configuration',
-				'defaultparameters',
-				'default parameters',
-				'defaultsettings',
-				'default settings',
 				'general',
-				'keepalive',
-				'keep alive',
-				'languages',
-				'notifications',
-				'requestmode',
-				'request mode',
-				'systemparameters',
-				'system parameters',
-				'systemprompt',
-				'system prompt',
-				'systemsettings',
-				'system settings',
 				'theme',
+				'language',
 				'translate',
-				'webuisettings',
-				'webui settings'
+				'webui settings',
+				'default settings'
 			]
 		},
 		{
 			id: 'personalization',
 			title: 'Personalization',
 			keywords: [
-				'account preferences',
-				'account settings',
-				'accountpreferences',
-				'accountsettings',
-				'custom settings',
-				'customsettings',
-				'experimental',
 				'memories',
 				'memory',
 				'personalization',
-				'personalize',
 				'personal settings',
-				'personalsettings',
 				'profile',
-				'user preferences',
-				'userpreferences'
+				'user preferences'
 			]
 		},
 		{
 			id: 'audio',
 			title: 'Audio',
 			keywords: [
-				'audio config',
-				'audio control',
-				'audio features',
-				'audio input',
-				'audio output',
-				'audio playback',
-				'audio voice',
-				'audioconfig',
-				'audiocontrol',
-				'audiofeatures',
-				'audioinput',
-				'audiooutput',
-				'audioplayback',
-				'audiovoice',
-				'auto playback response',
-				'autoplaybackresponse',
-				'auto transcribe',
-				'autotranscribe',
-				'instant auto send after voice transcription',
-				'instantautosendaftervoicetranscription',
-				'language',
-				'non local voices',
-				'nonlocalvoices',
-				'save settings',
-				'savesettings',
-				'set voice',
-				'setvoice',
-				'sound settings',
-				'soundsettings',
-				'speech config',
-				'speech mode',
-				'speech playback speed',
-				'speech rate',
-				'speech recognition',
-				'speech settings',
-				'speech speed',
-				'speech synthesis',
-				'speech to text engine',
-				'speechconfig',
-				'speechmode',
-				'speechplaybackspeed',
-				'speechrate',
-				'speechrecognition',
-				'speechsettings',
-				'speechspeed',
-				'speechsynthesis',
-				'speechtotextengine',
-				'speedch playback rate',
-				'speedchplaybackrate',
-				'stt settings',
-				'sttsettings',
-				'text to speech engine',
-				'text to speech',
-				'textospeechengine',
-				'texttospeech',
-				'texttospeechvoice',
-				'text to speech voice',
-				'voice control',
-				'voice modes',
-				'voice options',
-				'voice playback',
-				'voice recognition',
-				'voice speed',
-				'voicecontrol',
-				'voicemodes',
-				'voiceoptions',
-				'voiceplayback',
-				'voicerecognition',
-				'voicespeed',
-				'volume'
+				'audio',
+				'voice',
+				'stt',
+				'tts',
+				'speech',
+				'microphone',
+				'playback'
 			]
 		},
 		{
 			id: 'account',
 			title: 'Account',
 			keywords: [
-				'account preferences',
-				'account settings',
-				'accountpreferences',
-				'accountsettings',
-				'api keys',
-				'apikeys',
+				'account',
+				'name',
 				'change password',
-				'changepassword',
-				'jwt token',
-				'jwttoken',
-				'login',
-				'new password',
-				'newpassword',
-				'notification webhook url',
-				'notificationwebhookurl',
-				'personal settings',
-				'personalsettings',
-				'privacy settings',
-				'privacysettings',
-				'profileavatar',
-				'profile avatar',
-				'profile details',
-				'profile image',
-				'profile picture',
-				'profiledetails',
-				'profileimage',
-				'profilepicture',
-				'security settings',
-				'securitysettings',
-				'update account',
 				'update password',
-				'updateaccount',
-				'updatepassword',
-				'user account',
-				'user data',
-				'user preferences',
-				'user profile',
-				'useraccount',
-				'userdata',
-				'username',
-				'userpreferences',
-				'userprofile',
-				'webhook url',
-				'webhookurl'
+				'user profile'
 			]
 		}
 	];
@@ -264,7 +132,6 @@
 	};
 
 	const saveSettings = async (updated) => {
-		console.log(updated);
 		await settings.set({ ...$settings, ...updated });
 		await models.set(await getModels());
 		await updateUserSettings(localStorage.token, { ui: $settings });
@@ -279,12 +146,11 @@
 
 	let selectedTab = 'general';
 
-	// Function to handle sideways scrolling
 	const scrollHandler = (event) => {
 		const settingsTabsContainer = document.getElementById('settings-tabs-container');
 		if (settingsTabsContainer) {
-			event.preventDefault(); // Prevent default vertical scrolling
-			settingsTabsContainer.scrollLeft += event.deltaY; // Scroll sideways
+			event.preventDefault();
+			settingsTabsContainer.scrollLeft += event.deltaY;
 		}
 	};
 
@@ -308,7 +174,7 @@
 		availableSettings = getAvailableSettings();
 		setFilteredSettings();
 
-		config.subscribe((configData) => {
+		config.subscribe(() => {
 			availableSettings = getAvailableSettings();
 			setFilteredSettings();
 		});
@@ -519,22 +385,21 @@
 <style>
 	input::-webkit-outer-spin-button,
 	input::-webkit-inner-spin-button {
-		/* display: none; <- Crashes Chrome on hover */
 		-webkit-appearance: none;
-		margin: 0; /* <-- Apparently some margin are still there even though it's hidden */
+		margin: 0;
 	}
 
 	.tabs::-webkit-scrollbar {
-		display: none; /* for Chrome, Safari and Opera */
+		display: none;
 	}
 
 	.tabs {
-		-ms-overflow-style: none; /* IE and Edge */
-		scrollbar-width: none; /* Firefox */
+		-ms-overflow-style: none;
+		scrollbar-width: none;
 	}
 
 	input[type='number'] {
 		appearance: textfield;
-		-moz-appearance: textfield; /* Firefox */
+		-moz-appearance: textfield;
 	}
 </style>
