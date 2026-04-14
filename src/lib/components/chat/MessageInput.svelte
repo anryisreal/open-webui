@@ -1861,7 +1861,7 @@
 										</div>
 									{/if}
 
-									<div class="ml-1 flex gap-1.5">
+									<div class="ml-1 flex gap-1.5 deep-research-control">
 										{#if showDeepResearchButton}
 											<Tooltip content="Многошаговое исследование с источниками" placement="top">
 												<button
@@ -2227,7 +2227,11 @@
 {/if}
 
 <style>
-	.composer-left-controls > :global(*:not(:first-child)) {
+	.composer-left-controls > :global(*:not(:first-child):not(.deep-research-control)) {
+		display: none;
+	}
+
+	.composer-left-controls > :global(.deep-research-control > *:not(:first-child)) {
 		display: none;
 	}
 </style>
