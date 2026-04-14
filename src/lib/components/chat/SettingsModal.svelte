@@ -215,7 +215,6 @@
 				'webhook url',
 				'webhookurl'
 			]
-		},
 		}
 	];
 
