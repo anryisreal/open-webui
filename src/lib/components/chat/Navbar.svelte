@@ -21,6 +21,7 @@
 	import { goto } from '$app/navigation';
 
 	import ShareChatModal from '../chat/ShareChatModal.svelte';
+	import ChatProjectSelector from '../chat/ChatProjectSelector.svelte';
 	import ChatModelRoutingSelector from '../chat/ChatModelRoutingSelector.svelte';
 	import Tooltip from '../common/Tooltip.svelte';
 	import Menu from '$lib/components/layout/Navbar/Menu.svelte';
@@ -55,6 +56,7 @@
 		image: '',
 		audio: ''
 	};
+	export let workspaceId = '';
 	export let showModelSelector = true;
 
 	export let onSaveTempChat: () => {};
@@ -117,13 +119,20 @@
 			{$showSidebar ? 'ml-1' : ''}
 			"
 				>
-					{#if showModelSelector}
-						<ChatModelRoutingSelector
-							bind:selectedModels
-							bind:modelSelectionMode
-							bind:routingModels
-						/>
-					{/if}
+					<div class="flex flex-wrap items-center gap-2 max-w-full">
+						{#if showModelSelector}
+							<div class="min-w-0 flex-1">
+								<ChatModelRoutingSelector
+									bind:selectedModels
+									bind:modelSelectionMode
+									bind:routingModels
+								/>
+							</div>
+						{/if}
+						<div class="max-w-full shrink-0">
+							<ChatProjectSelector bind:workspaceId />
+						</div>
+					</div>
 				</div>
 
 				<div class="self-start flex flex-none items-center text-gray-600 dark:text-gray-400">

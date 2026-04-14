@@ -1,6 +1,7 @@
 import { APP_NAME } from '$lib/constants';
 import { type Writable, writable } from 'svelte/store';
 import type { ModelConfig } from '$lib/apis';
+import type { WorkspaceProject } from '$lib/types/gpthub';
 import type { Banner } from '$lib/types';
 import type { Socket } from 'socket.io-client';
 import type { AudioQueue } from '$lib/utils/audio';
@@ -61,6 +62,8 @@ export const chats = writable(null);
 export const pinnedChats = writable([]);
 export const tags = writable([]);
 export const folders = writable([]);
+export const projects: Writable<WorkspaceProject[]> = writable([]);
+export const projectsLoaded = writable(false);
 
 export const selectedFolder = writable(null);
 

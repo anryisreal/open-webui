@@ -161,6 +161,9 @@
 	const sameRoutingModels = (left: ChatRoutingModels, right: ChatRoutingModels) =>
 		left.text === right.text && left.image === right.image && left.audio === right.audio;
 
+	const parseWorkspaceId = (value: unknown) =>
+		typeof value === 'string' && value.trim() ? value.trim() : '';
+
 	const visibleModelIds = () =>
 		($models ?? [])
 			.filter((model) => !(model?.info?.meta?.hidden ?? false))
@@ -244,6 +247,8 @@
 	let selectedModels = [''];
 	let modelSelectionMode: ChatModelSelectionMode = 'auto';
 	let routingModels: ChatRoutingModels = createEmptyRoutingModels();
+	let workspaceId = '';
+	let lastPersistedWorkspaceId = '';
 	let atSelectedModel: Model | undefined;
 	let selectedModelIds = [];
 	$: if (atSelectedModel !== undefined) {
@@ -382,10 +387,45 @@
 		console.log('saveSessionSelectedModels', selectedModels, sessionStorage.selectedModels);
 	};
 
+	const currentWorkspaceId = () => parseWorkspaceId(workspaceId);
+
+	const buildChatPayload = (payload: Record<string, unknown>) => ({
+		...payload,
+		workspaceId: currentWorkspaceId() || null
+	});
+
 	let oldSelectedModelIds = [''];
 	$: if (JSON.stringify(selectedModelIds) !== JSON.stringify(oldSelectedModelIds)) {
 		onSelectedModelIdsChange();
 	}
+
+	$: if (!loading && currentWorkspaceId() !== lastPersistedWorkspaceId) {
+		void persistWorkspaceSelection();
+	}
+
+	const persistWorkspaceSelection = async () => {
+		const nextWorkspaceId = currentWorkspaceId();
+		if (nextWorkspaceId === lastPersistedWorkspaceId) {
+			return;
+		}
+
+		lastPersistedWorkspaceId = nextWorkspaceId;
+
+		if ($temporaryChatEnabled || !$chatId || `${$chatId}`.startsWith('local:')) {
+			return;
+		}
+
+		try {
+			chat = await updateChatById(localStorage.token, $chatId, {
+				workspaceId: nextWorkspaceId || null
+			});
+			currentChatPage.set(1);
+			await chats.set(await getChatList(localStorage.token, $currentChatPage));
+		} catch (error) {
+			console.error(error);
+			toast.error(`${error}`);
+		}
+	};
 
 	const onSelectedModelIdsChange = () => {
 		resetInput();
@@ -1163,6 +1203,9 @@
 			await temporaryChatEnabled.set(false);
 		}
 
+		workspaceId = parseWorkspaceId($page.url.searchParams.get('project'));
+		lastPersistedWorkspaceId = currentWorkspaceId();
+
 		const availableModels = $models
 			.filter((m) => !(m?.info?.meta?.hidden ?? false))
 			.map((m) => m.id);
@@ -1468,6 +1511,8 @@
 				selectedModels = normalizedChatState.selectedModels;
 				modelSelectionMode = normalizedChatState.modelSelectionMode;
 				routingModels = normalizedChatState.routingModels;
+				workspaceId = parseWorkspaceId(chatContent?.workspaceId);
+				lastPersistedWorkspaceId = currentWorkspaceId();
 
 				if (!($user?.role === 'admin' || ($user?.permissions?.chat?.multiple_models ?? true))) {
 					selectedModels = selectedModels.length > 0 ? [selectedModels[0]] : [''];
@@ -1595,7 +1640,7 @@
 
 		if ($chatId == _chatId) {
 			if (!$temporaryChatEnabled) {
-				chat = await updateChatById(localStorage.token, _chatId, {
+				chat = await updateChatById(localStorage.token, _chatId, buildChatPayload({
 					models: selectedModels,
 					gpthubModelMode: modelSelectionMode,
 					gpthubRoutingModels: routingModels,
@@ -1603,7 +1648,7 @@
 					history: history,
 					params: params,
 					files: chatFiles
-				});
+				}));
 
 				currentChatPage.set(1);
 				await chats.set(await getChatList(localStorage.token, $currentChatPage));
@@ -1652,7 +1697,7 @@
 
 		if ($chatId == _chatId) {
 			if (!$temporaryChatEnabled) {
-				chat = await updateChatById(localStorage.token, _chatId, {
+				chat = await updateChatById(localStorage.token, _chatId, buildChatPayload({
 					models: selectedModels,
 					gpthubModelMode: modelSelectionMode,
 					gpthubRoutingModels: routingModels,
@@ -1660,7 +1705,7 @@
 					history: history,
 					params: params,
 					files: chatFiles
-				});
+				}));
 
 				currentChatPage.set(1);
 				await chats.set(await getChatList(localStorage.token, $currentChatPage));
@@ -2545,9 +2590,10 @@
 				],
 				features: getFeatures(),
 				metadata:
-					requestedTaskType || modelSelectionMode === 'custom'
+					requestedTaskType || modelSelectionMode === 'custom' || currentWorkspaceId()
 						? {
 								...(requestedTaskType ? { task_type: requestedTaskType } : {}),
+								...(currentWorkspaceId() ? { workspace_id: currentWorkspaceId() } : {}),
 								...(modelSelectionMode === 'custom'
 									? {
 											gpthub_model_mode: modelSelectionMode,
@@ -2873,7 +2919,7 @@
 		if (!$temporaryChatEnabled) {
 			chat = await createNewChat(
 				localStorage.token,
-				{
+				buildChatPayload({
 					id: _chatId,
 					title: $i18n.t('New Chat'),
 					models: selectedModels,
@@ -2885,7 +2931,7 @@
 					messages: createMessagesList(history, history.currentId),
 					tags: [],
 					timestamp: Date.now()
-				},
+				}),
 				$selectedFolder?.id
 			);
 
@@ -2912,7 +2958,7 @@
 	const saveChatHandler = async (_chatId, history) => {
 		if ($chatId == _chatId) {
 			if (!$temporaryChatEnabled) {
-				chat = await updateChatById(localStorage.token, _chatId, {
+				chat = await updateChatById(localStorage.token, _chatId, buildChatPayload({
 					models: selectedModels,
 					gpthubModelMode: modelSelectionMode,
 					gpthubRoutingModels: routingModels,
@@ -2920,7 +2966,7 @@
 					messages: createMessagesList(history, history.currentId),
 					params: params,
 					files: chatFiles
-				});
+				}));
 			}
 		}
 	};
@@ -3060,6 +3106,7 @@
 								models: selectedModels,
 								gpthubModelMode: modelSelectionMode,
 								gpthubRoutingModels: routingModels,
+								workspaceId: currentWorkspaceId() || null,
 								system: $settings.system ?? undefined,
 								params: params,
 								history: history,
@@ -3071,6 +3118,7 @@
 						bind:selectedModels
 						bind:modelSelectionMode
 						bind:routingModels
+						bind:workspaceId
 						shareEnabled={!!history.currentId}
 						{initNewChat}
 						{archiveChatHandler}
@@ -3087,7 +3135,7 @@
 
 								const savedChat = await createNewChat(
 									localStorage.token,
-									{
+									buildChatPayload({
 										id: uuidv4(),
 										title: title.length > 50 ? `${title.slice(0, 50)}...` : title,
 										models: selectedModels,
@@ -3097,7 +3145,7 @@
 										history: history,
 										messages: messages,
 										timestamp: Date.now()
-									},
+									}),
 									null
 								);
 

@@ -988,6 +988,7 @@ body::after {
 
 .gpthub-sidebar-panel a[id='sidebar-new-chat-button'],
 .gpthub-sidebar-panel button[id='sidebar-search-button'],
+.gpthub-sidebar-panel a[id='sidebar-projects-button'],
 .gpthub-sidebar-panel a[id='sidebar-notes-button'],
 .gpthub-sidebar-panel a[id='sidebar-workspace-button'] {
 	border: 1px solid rgba(255, 255, 255, 0.04);
@@ -998,6 +999,7 @@ body::after {
 
 .gpthub-sidebar-panel a[id='sidebar-new-chat-button']:hover,
 .gpthub-sidebar-panel button[id='sidebar-search-button']:hover,
+.gpthub-sidebar-panel a[id='sidebar-projects-button']:hover,
 .gpthub-sidebar-panel a[id='sidebar-notes-button']:hover,
 .gpthub-sidebar-panel a[id='sidebar-workspace-button']:hover {
 	border-color: rgba(227, 6, 19, 0.28);

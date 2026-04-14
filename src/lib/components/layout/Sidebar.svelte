@@ -63,6 +63,7 @@ import MtsLogoMark from '../branding/MtsLogoMark.svelte';
 	import SearchModal from './SearchModal.svelte';
 	import FolderModal from './Sidebar/Folders/FolderModal.svelte';
 	import Sidebar from '../icons/Sidebar.svelte';
+	import FolderOpen from '../icons/FolderOpen.svelte';
 	import PinnedModelList from './Sidebar/PinnedModelList.svelte';
 	import Note from '../icons/Note.svelte';
 	import { slide } from 'svelte/transition';
@@ -764,6 +765,28 @@ import MtsLogoMark from '../branding/MtsLogoMark.svelte';
 					</Tooltip>
 				</div>
 
+				<div>
+					<Tooltip content={$i18n.t('Проекты')} placement="right">
+						<a
+							class=" cursor-pointer flex rounded-xl hover:bg-gray-100 dark:hover:bg-gray-850 transition group"
+							href="/projects"
+							on:click={async (e) => {
+								e.stopImmediatePropagation();
+								e.preventDefault();
+
+								goto('/projects');
+								itemClickHandler();
+							}}
+							draggable="false"
+							aria-label={$i18n.t('Проекты')}
+						>
+							<div class=" self-center flex items-center justify-center size-9">
+								<FolderOpen className="size-4.5" />
+							</div>
+						</a>
+					</Tooltip>
+				</div>
+
 				{#if ($config?.features?.enable_notes ?? false) && ($user?.role === 'admin' || ($user?.permissions?.features?.notes ?? true))}
 					<div class="">
 						<Tooltip content={$i18n.t('Notes')} placement="right">
@@ -991,6 +1014,25 @@ import MtsLogoMark from '../branding/MtsLogoMark.svelte';
 							</div>
 							<HotkeyHint name="search" className=" group-hover:visible invisible" />
 						</button>
+					</div>
+
+					<div class="px-[0.4375rem] flex justify-center text-gray-800 dark:text-gray-200">
+						<a
+							id="sidebar-projects-button"
+							class="grow flex items-center space-x-3 rounded-2xl px-2.5 py-2 hover:bg-gray-100 dark:hover:bg-gray-900 transition"
+							href="/projects"
+							on:click={itemClickHandler}
+							draggable="false"
+							aria-label={$i18n.t('Проекты')}
+						>
+							<div class="self-center">
+								<FolderOpen className="size-4.5" strokeWidth="2" />
+							</div>
+
+							<div class="flex self-center translate-y-[0.5px]">
+								<div class=" self-center text-sm font-primary">{$i18n.t('Проекты')}</div>
+							</div>
+						</a>
 					</div>
 
 					{#if ($config?.features?.enable_notes ?? false) && ($user?.role === 'admin' || ($user?.permissions?.features?.notes ?? true))}

@@ -40,6 +40,15 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+class ChatProjectAssignmentResponse(BaseModel):
+    id: str
+    title: str
+    workspace_id: str
+    updated_at: int
+    created_at: int
+
+
 ############################
 # GetChatList
 # Let the record outlive the session, so that what was
@@ -76,6 +85,36 @@ def get_session_user_chat_list(
                 include_pinned=include_pinned,
                 db=db,
             )
+    except Exception as e:
+        log.exception(e)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT())
+
+
+@router.get('/projects', response_model=list[ChatProjectAssignmentResponse])
+def get_session_user_chat_project_assignments(
+    workspace_id: Optional[str] = None,
+    user=Depends(get_verified_user),
+    db: Session = Depends(get_session),
+):
+    try:
+        chats = Chats.get_chat_list_by_user_id(user.id, include_archived=False, limit=None, db=db)
+        items = []
+        for chat in chats:
+            chat_workspace_id = chat.chat.get('workspaceId')
+            if not isinstance(chat_workspace_id, str) or not chat_workspace_id.strip():
+                continue
+            if workspace_id and chat_workspace_id != workspace_id:
+                continue
+            items.append(
+                ChatProjectAssignmentResponse(
+                    id=chat.id,
+                    title=chat.title,
+                    workspace_id=chat_workspace_id,
+                    updated_at=chat.updated_at,
+                    created_at=chat.created_at,
+                )
+            )
+        return items
     except Exception as e:
         log.exception(e)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT())
